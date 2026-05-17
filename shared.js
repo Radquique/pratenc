@@ -394,6 +394,7 @@ const REF_NOTES = {
 
 async function storageGet(key, shared = false) {
   try {
+    if (!window.storage) return null;
     const r = await window.storage.get(key, shared);
     return r ? JSON.parse(r.value) : null;
   } catch { return null; }
@@ -401,6 +402,7 @@ async function storageGet(key, shared = false) {
 
 async function storageSet(key, val, shared = false) {
   try {
+    if (!window.storage) return false;
     await window.storage.set(key, JSON.stringify(val), shared);
     return true;
   } catch { return false; }
