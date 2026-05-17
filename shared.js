@@ -391,21 +391,29 @@ const REF_NOTES = {
 };
 
 // ─── Funcions de storage persistents ──────────────────────────
+// window.storage = Claude artifacts | localStorage = navegador normal | null = GitHub Pages
 
 async function storageGet(key, shared = false) {
   try {
-    if (!window.storage) return null;
-    const r = await window.storage.get(key, shared);
-    return r ? JSON.parse(r.value) : null;
+    if (window.storage) {
+      const r = await window.storage.get(key, shared);
+      return r ? JSON.parse(r.value) : null;
+    }
+  } catch {}
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : null;
   } catch { return null; }
 }
 
 async function storageSet(key, val, shared = false) {
   try {
-    if (!window.storage) return false;
-    await window.storage.set(key, JSON.stringify(val), shared);
-    return true;
-  } catch { return false; }
+    if (window.storage) {
+      await window.storage.set(key, JSON.stringify(val), shared);
+    }
+  } catch {}
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  return true;
 }
 
 // ─── Atletes: carregar / guardar ──────────────────────────────
@@ -414,22 +422,15 @@ async function loadAthletes() {
   if (typeof ATLETES_DATA !== 'undefined' && Array.isArray(ATLETES_DATA)) {
     return JSON.parse(JSON.stringify(ATLETES_DATA));
   }
-  // Prioritat 2: storage persistent (Claude artifacts)
+  // Prioritat 2: storage / localStorage
   const fromStorage = await storageGet('pratenc_atletes', false);
   if (fromStorage && Array.isArray(fromStorage)) return fromStorage;
-  // Prioritat 3: localStorage (versió local privada)
-  const fromLocal = localStorage.getItem('pratenc_atletes');
-  if (fromLocal) {
-    try { return JSON.parse(fromLocal); } catch { return []; }
-  }
   return [];
 }
 
 async function saveAthletes(athletes) {
-  // En versió pública (ATLETES_DATA definida) no guardem res
   if (typeof ATLETES_DATA !== 'undefined') return;
-  localStorage.setItem('pratenc_atletes', JSON.stringify(athletes));
-  try { await storageSet('pratenc_atletes', athletes, false); } catch {}
+  await storageSet('pratenc_atletes', athletes, false);
 }
 
 // ─── Referència campionats: carregar / guardar ────────────────
@@ -445,30 +446,24 @@ async function saveRefCampeonats(ref) {
 
 // ─── Simulador: estat ─────────────────────────────────────────
 async function loadSimState() {
-  const s = await storageGet('pratenc_sim', false);
-  return s || {};
+  return (await storageGet('pratenc_sim', false)) || {};
 }
 async function saveSimState(s) {
   await storageSet('pratenc_sim', s, false);
-  localStorage.setItem('pratenc_sim', JSON.stringify(s));
 }
 
 async function loadRelState() {
-  const s = await storageGet('pratenc_rel', false);
-  return s || {};
+  return (await storageGet('pratenc_rel', false)) || {};
 }
 async function saveRelState(s) {
   await storageSet('pratenc_rel', s, false);
-  localStorage.setItem('pratenc_rel', JSON.stringify(s));
 }
 
 async function loadExcluded() {
-  const e = await storageGet('pratenc_excl', false);
-  return e || JSON.parse(localStorage.getItem('pratenc_excl') || '[]');
+  return (await storageGet('pratenc_excl', false)) || [];
 }
 async function saveExcluded(e) {
   await storageSet('pratenc_excl', e, false);
-  localStorage.setItem('pratenc_excl', JSON.stringify(e));
 }
 
 // ─── Càlculs WMA ──────────────────────────────────────────────
