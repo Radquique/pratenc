@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pratenc AA — Simulador Campionat Master</title>
+<link rel="stylesheet" href="style.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f7fb;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1rem;text-align:center;}
+.logo{width:80px;height:80px;background:#2563a8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:800;color:#fff;margin:0 auto 1.2rem;}
+h1{font-size:1.35rem;font-weight:700;color:#1a3a5c;margin-bottom:0.4rem;}
+.sub{color:#6b7f93;font-size:0.88rem;max-width:360px;margin:0 auto 2rem;line-height:1.5;}
+.btns{display:flex;gap:0.9rem;flex-wrap:wrap;justify-content:center;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:0.7rem 1.5rem;border-radius:9px;font-size:0.88rem;font-weight:600;text-decoration:none;transition:all 0.15s;border:2px solid transparent;}
+.btn.primary{background:#2563a8;color:white;border-color:#2563a8;}
+.btn.primary:hover{background:#1d4f8c;}
+.btn.sec{background:white;color:#2563a8;border-color:#2563a8;}
+.btn.sec:hover{background:#e8f0fa;}
+.footer{margin-top:2.5rem;font-size:0.72rem;color:#aaa;}
+@media(max-width:400px){
+  h1{font-size:1.1rem;}
+  .btns{flex-direction:column;align-items:center;}
+  .btn{width:220px;justify-content:center;}
+}
+</style>
+</head>
+<body>
+<div class="logo">PA</div>
+<h1>Pratenc Associació d'Atletisme</h1>
+<p class="sub">Simulador de Campionat Master Femení · Clubs 1ª Divisió<br>Temporada 2026</p>
+<div class="btns">
+  <a href="simulador-public.html" class="btn primary">🏃 Simular ara</a>
+  <a href="atletes-public.html" class="btn sec">👟 Atletes</a>
+  <a href="campeonatos-public.html" class="btn sec">📊 Referència campionats</a>
+</div>
+<p class="footer">Pratenc AA · Dades WMA 2023 · Actualitzat pel club</p>
+</body>
+</html>

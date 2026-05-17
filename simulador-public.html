@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pratenc AA — Simulador</title>
+<link rel="stylesheet" href="style.css">
+<style>
+:root{
+  --blue-dark:#1a3a5c;--blue:#2563a8;--blue-pale:#e8f0fa;
+  --green:#1a7a3a;--green-pale:#e6f5ec;
+  --border:#d4dde8;--text:#1c2b3a;--text-muted:#6b7f93;--bg:#f4f7fb;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+header{background:var(--blue-dark);color:white;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem;}
+.header-logo{width:46px;height:46px;background:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:white;flex-shrink:0;}
+.header-text h1{font-size:1.05rem;font-weight:700;}
+.header-text .sub{font-size:0.76rem;opacity:0.75;margin-top:2px;}
+.header-right{margin-left:auto;}
+nav{background:var(--blue);display:flex;gap:0;padding:0 1rem;}
+nav a{color:rgba(255,255,255,0.75);text-decoration:none;padding:0.6rem 1rem;font-size:0.8rem;font-weight:500;border-bottom:3px solid transparent;transition:all 0.15s;}
+nav a:hover{color:white;background:rgba(255,255,255,0.1);}
+nav a.active{color:white;border-bottom-color:white;}
+main{padding:1.25rem 1.5rem;max-width:1500px;margin:0 auto;}
+
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:0.65rem;margin-bottom:1.1rem;}
+.stat{background:white;border:1.5px solid var(--border);border-radius:10px;padding:0.65rem 0.8rem;text-align:center;}
+.stat .val{font-size:1.5rem;font-weight:800;color:var(--blue-dark);font-family:'Courier New',monospace;}
+.stat .lbl{font-size:0.67rem;color:var(--text-muted);margin-top:2px;}
+.stat.err .val{color:#dc2626;}
+
+.layout{display:grid;grid-template-columns:1fr 260px 295px;gap:1.1rem;align-items:start;}
+@media(max-width:1100px){.layout{grid-template-columns:1fr 270px;}}
+@media(max-width:700px){.layout{grid-template-columns:1fr;}}
+.sticky{position:sticky;top:1rem;}
+
+.btn{display:inline-flex;align-items:center;gap:4px;padding:0.38rem 0.85rem;border-radius:7px;border:1.5px solid var(--border);background:white;font-size:0.78rem;font-weight:500;cursor:pointer;color:var(--text);transition:all 0.15s;}
+.btn:hover{border-color:var(--blue);color:var(--blue);}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:white;}
+.btn.primary:hover{background:#1d4f8c;}
+.btn.opt{background:linear-gradient(135deg,#1a3a5c,#2563a8);border:none;color:white;font-weight:700;padding:0.5rem 1.2rem;font-size:0.82rem;}
+.btn.opt:hover{opacity:0.9;}
+.btn.sm{font-size:0.72rem;padding:0.25rem 0.6rem;}
+
+/* ATHLETE BLOCKS */
+.ab{background:white;border:1.5px solid var(--border);border-radius:11px;margin-bottom:0.55rem;overflow:hidden;}
+.ab.excl{opacity:0.48;}
+.ab.err{border-color:#dc2626;border-width:2px;}
+.ab-head{padding:0.55rem 0.85rem;display:flex;align-items:center;gap:0.55rem;border-bottom:1px solid #eef2f7;background:linear-gradient(135deg,#fafcff,#eff6ff);}
+.av{width:32px;height:32px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;flex-shrink:0;}
+.ai-nom{font-weight:600;font-size:0.83rem;display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.ai-sub{font-size:0.68rem;color:var(--text-muted);margin-top:1px;}
+.a-pts{font-size:0.95rem;font-weight:700;font-family:'Courier New',monospace;color:var(--blue);}
+
+.fb{display:inline-flex;align-items:center;padding:1px 5px;border-radius:3px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;font-size:0.6rem;font-weight:700;text-transform:uppercase;}
+.xt{padding:0.18rem 0.5rem;border-radius:4px;border:1.5px solid;font-size:0.68rem;font-weight:600;cursor:pointer;}
+.xt.on{background:var(--green-pale);border-color:var(--green);color:var(--green);}
+.xt.off{background:#fee2e2;border-color:#dc2626;color:#dc2626;}
+
+/* PROVA ROWS */
+.pr-rows{padding:0.45rem 0.85rem 0.55rem;}
+.pr{display:grid;grid-template-columns:1fr 88px 32px 18px;gap:4px;align-items:center;margin-bottom:3px;}
+.ps{padding:0.26rem 0.35rem;border:1.5px solid var(--border);border-radius:5px;font-size:0.76rem;background:white;color:var(--text);width:100%;}
+.ps:focus{border-color:var(--blue);outline:none;}
+.ps.man{border-color:#f59e0b;background:#fffbeb;}
+.pi{padding:0.26rem 0.35rem;border:1.5px solid var(--border);border-radius:5px;font-size:0.73rem;width:100%;font-family:'Courier New',monospace;text-align:right;background:white;}
+.pi:focus{border-color:var(--blue);outline:none;}
+.pi.man{border-color:#f59e0b;background:#fffbeb;}
+.pp{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:4px;font-size:0.72rem;font-weight:700;background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe;}
+.pp0{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0;}
+.bi{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;padding:0 2px;border-radius:3px;line-height:1;}
+.bi:hover{background:#fee2e2;color:#dc2626;}
+
+/* pct+pencil wrapper */
+.pct-wrap{display:flex;align-items:center;gap:2px;}
+.pencil-btn{background:none;border:none;cursor:pointer;font-size:0.72rem;padding:1px 2px;border-radius:3px;line-height:1;color:var(--text-muted);}
+.pencil-btn:hover{background:#e0f2fe;color:#0369a1;}
+.pencil-btn:disabled{opacity:0.3;cursor:default;}
+
+.sugg-row{margin-top:3px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:0.67rem;color:var(--text-muted);}
+.sp{cursor:pointer;background:var(--blue-pale);color:var(--blue);padding:1px 5px;border-radius:4px;font-size:0.66rem;font-weight:500;border:1px solid #bfdbfe;white-space:nowrap;}
+.sp:hover{background:#bfdbfe;}
+.sp.tk{opacity:0.38;cursor:default;text-decoration:line-through;}
+.err-row{margin-top:4px;background:#fee2e2;border:1px solid #dc2626;border-radius:4px;padding:2px 7px;font-size:0.68rem;color:#991b1b;font-weight:600;}
+
+/* PROVES PANEL */
+.panel{background:white;border:1.5px solid var(--border);border-radius:11px;padding:0.85rem;}
+.panel h3{font-size:0.82rem;font-weight:600;color:var(--blue-dark);margin-bottom:0.5rem;}
+.pi-row{display:flex;align-items:center;padding:3px 5px;border-radius:4px;font-size:0.72rem;margin-bottom:2px;}
+.pi-row.cov{background:#f0fdf4;color:#166534;}
+.pi-row.free{background:#f8fafc;color:var(--text-muted);}
+.pi-name{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.71rem;}
+.pi-who{font-size:0.62rem;color:var(--text-muted);margin-left:3px;white-space:nowrap;}
+.pi-pts{font-size:0.65rem;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:3px;flex-shrink:0;}
+.pi-pts.ok{background:#dcfce7;color:#166534;border:1px solid #86efac;}
+.pi-pts.no{background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;}
+
+/* RESULT PANEL */
+.rt{width:100%;border-collapse:collapse;font-size:0.73rem;}
+.rt th{padding:0.3rem 0.38rem;text-align:left;font-size:0.65rem;font-weight:600;color:var(--text-muted);border-bottom:1.5px solid var(--border);}
+.rt td{padding:0.27rem 0.38rem;border-bottom:1px solid #f0f4f8;vertical-align:middle;}
+.rk{display:inline-flex;align-items:center;justify-content:center;width:24px;height:19px;border-radius:4px;font-size:0.68rem;font-weight:700;}
+.r1{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.r2{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;}
+.r3{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.rN{background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe;}
+
+.wb{border-radius:5px;padding:0.4rem 0.65rem;font-size:0.71rem;margin-bottom:0.55rem;}
+.we{background:#fee2e2;border:1px solid #dc2626;color:#991b1b;}
+.ww{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;}
+
+/* MODAL */
+.mover{position:fixed;inset:0;background:rgba(0,0,0,0.38);z-index:300;display:none;align-items:center;justify-content:center;}
+.mover.open{display:flex;}
+.mbox{background:white;border-radius:13px;padding:1.4rem;width:450px;max-width:95vw;box-shadow:0 16px 50px rgba(0,0,0,0.22);}
+.mbox h3{font-size:0.95rem;font-weight:700;color:var(--blue-dark);margin-bottom:0.9rem;}
+.mf label{font-size:0.72rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px;}
+.mf input,.mf select{width:100%;padding:0.38rem 0.55rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.82rem;}
+.mf input:focus,.mf select:focus{outline:none;border-color:var(--blue);}
+.ad{padding:0.38rem 0.55rem;background:#f0f6ff;border-radius:6px;font-size:0.85rem;font-weight:700;color:var(--blue);}
+.mac{display:flex;gap:7px;justify-content:flex-end;margin-top:1.1rem;}
+
+.toast{position:fixed;bottom:22px;right:22px;background:#1e293b;color:white;padding:0.55rem 1rem;border-radius:8px;font-size:0.8rem;opacity:0;transform:translateY(8px);transition:all 0.22s;pointer-events:none;z-index:999;}
+.toast.show{opacity:1;transform:translateY(0);}
+.lod{position:fixed;inset:0;background:rgba(255,255,255,0.88);display:flex;align-items:center;justify-content:center;z-index:99;font-size:0.88rem;color:var(--blue);}
+.sim-banner{background:linear-gradient(135deg,#dbeafe,#e0f2fe);border:1.5px solid #7dd3fc;border-radius:9px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;font-size:0.8rem;color:#0c4a6e;display:none;align-items:center;gap:7px;}
+.sim-banner.show{display:flex;}
+.empty{text-align:center;padding:2.5rem;color:var(--text-muted);}
+.empty .ic{font-size:2rem;margin-bottom:0.35rem;}
+
+/* Barra 75% */
+.quota-bar-wrap{height:6px;background:#e2e8f0;border-radius:3px;margin-top:5px;overflow:hidden;}
+.quota-bar{height:100%;border-radius:3px;transition:width 0.3s;}
+.quota-ok{background:#22c55e;}
+.quota-warn{background:#f59e0b;}
+.quota-bad{background:#dc2626;}
+
+/* Modal filials */
+.fil-modal-list{max-height:220px;overflow-y:auto;margin:0.6rem 0;}
+@media(max-width:600px){
+  header{padding:0.7rem 1rem;}
+  .header-text h1{font-size:0.88rem;}
+  .header-text .sub{font-size:0.68rem;}
+  .header-right .btn{padding:0.28rem 0.55rem;font-size:0.7rem;}
+  nav a{padding:0.5rem 0.7rem;font-size:0.75rem;}
+  main{padding:0.75rem;}
+  .stats-bar{grid-template-columns:repeat(3,1fr);gap:0.4rem;}
+  .stats-bar .stat:nth-child(4),.stats-bar .stat:nth-child(5){grid-column:span 1;}
+  .stat .val{font-size:1.1rem;}
+  .layout{grid-template-columns:1fr!important;}
+  .sticky{position:static;}
+  .ab-head{padding:0.45rem 0.65rem;}
+  .ai-nom{font-size:0.78rem;}
+  .pr-rows{padding:0.35rem 0.65rem 0.45rem;}
+  .pr{grid-template-columns:1fr 80px 26px 16px;gap:3px;}
+  .panel{margin-bottom:0.8rem;}
+  .mbox{padding:1rem;border-radius:10px;}
+  /* Relleus panel inferior més compacte */
+  .rel-panel-mob{font-size:0.75rem;}
+}
+.fil-modal-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:0.8rem;cursor:pointer;transition:background 0.1s;}
+.fil-modal-row:hover{background:#f0f6ff;}
+.fil-modal-row.sel{background:#dbeafe;border-color:var(--blue);}
+</style>
+</head>
+<body>
+<div class="lod" id="lod">⏳ Carregant...</div>
+
+<header>
+  <div class="header-logo">PA</div>
+  <div class="header-text">
+    <h1>Pratenc Associació d'Atletisme</h1>
+    <div class="sub">Simulador de campionat · Equip femení</div>
+  </div>
+  <div class="header-right">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+      <button class="btn sm" onclick="resetSim()">🗑 Reset</button>
+      <button class="btn opt" onclick="runOptimizer()">▶ Simular</button>
+    </div>
+  </div>
+</header>
+<nav>
+  <a href="atletes-public.html">👟 Atletes</a>
+  <a href="campeonatos-public.html">📊 Referència campionats</a>
+  <a href="simulador-public.html" class="active">🏃 Simulador</a>
+</nav>
+
+<main>
+  <div class="stats-bar">
+    <div class="stat"><div class="val" id="sTot">0</div><div class="lbl">Punts totals</div></div>
+    <div class="stat"><div class="val" id="sAtl">0</div><div class="lbl">Atletes actives</div></div>
+    <div class="stat" id="sPlacesEl">
+      <div class="val" id="sPlaces">0/27</div>
+      <div class="lbl">Places cobertes</div>
+      <div style="font-size:0.6rem;margin-top:2px;" id="sPlacesPct">mínim 21 (75%)</div>
+    </div>
+    <div class="stat"><div class="val" id="sLli">0</div><div class="lbl">Proves lliures</div></div>
+    <div class="stat" id="sFstat"><div class="val" id="sFil">0/4</div><div class="lbl">Filials actives</div></div>
+  </div>
+
+  <div class="sim-banner" id="sb">
+    ▶ <strong>Simulació completada!</strong> Distribució màxima calculada.
+    <button class="btn sm" style="margin-left:auto;" onclick="document.getElementById('sb').classList.remove('show')">✕</button>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.65rem;flex-wrap:wrap;gap:6px;">
+        <h2 style="font-size:0.95rem;font-weight:600;color:var(--blue-dark);">Assignació per atleta</h2>
+        <span style="font-size:0.7rem;color:var(--text-muted);">Màx. <b>2 proves/atleta</b> · Filials: <b>4 proves total</b> · <b>4 filials/club</b> · Mínim <b>21/27 places</b> (75%)</span>
+      </div>
+      <div id="blocks"></div>
+    </div>
+
+    <div class="sticky">
+      <div class="panel">
+        <h3>📋 Proves del campionat</h3>
+        <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:0.5rem;">Cobertes ✓ · Lliures —</div>
+        <div id="provPanel"></div>
+      </div>
+    </div>
+
+    <div class="sticky">
+      <div class="panel">
+        <div style="font-size:0.88rem;font-weight:600;color:var(--blue-dark);margin-bottom:0.6rem;">📊 Puntuació</div>
+        <div id="wbs"></div>
+        <table class="rt">
+          <thead><tr><th>Atleta</th><th>Prova</th><th>%</th><th>Pos</th><th>Pts</th></tr></thead>
+          <tbody id="rb"></tbody>
+        </table>
+        <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:0.8rem;color:var(--text-muted);">Total estimat</span>
+          <span style="font-size:1.9rem;font-weight:700;font-family:'Courier New',monospace;color:var(--blue);" id="totB">0</span>
+        </div>
+        <button class="btn primary" style="width:100%;justify-content:center;margin-top:0.6rem;font-size:0.77rem;" onclick="window.print()">🖨 Imprimir</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal previsió -->
+<div class="mover" id="pm">
+  <div class="mbox">
+    <h3>✏️ Previsió manual de marca</h3>
+    <p style="font-size:0.77rem;color:var(--text-muted);margin-bottom:0.9rem;">Introdueix una marca prevista o un % WMA directament per a una prova on l'atleta no té registre oficial.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+      <div class="mf" style="grid-column:1/-1">
+        <label>Atleta · Prova</label>
+        <div class="ad" id="pmCtx">—</div>
+      </div>
+      <div class="mf" style="grid-column:1/-1">
+        <label>Marca prevista <span style="font-weight:400;color:var(--text-muted)">(ex: 13.45 / 1:23.4 / 5.80)</span></label>
+        <input type="text" id="pmM" placeholder="Introdueix la marca..." oninput="calcPM()">
+      </div>
+      <div class="mf">
+        <label>% WMA calculat</label>
+        <div class="ad" id="pmP">—</div>
+      </div>
+      <div class="mf">
+        <label>Punts estimats</label>
+        <div class="ad" id="pmPts">—</div>
+      </div>
+      <div class="mf" style="grid-column:1/-1">
+        <label>O introdueix % WMA directament</label>
+        <input type="number" id="pmD" min="0" max="105" step="0.01" placeholder="Ex: 78.50" oninput="calcPMD()">
+      </div>
+    </div>
+    <div class="mac">
+      <button class="btn" onclick="closePM()">Cancel·lar</button>
+      <button class="btn primary" onclick="applyPM()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Modal conflicte filials: l'usuari tria quina prova sacrificar -->
+<div class="mover" id="filModal">
+  <div class="mbox">
+    <h3>⚠️ Límit de filials superat</h3>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.9rem;">
+      Les filials ja fan <strong>4 proves</strong> en total. S'ha intentat assignar una prova nova a <strong id="filModalNom">—</strong>.
+      <br>Tria quina prova vols <strong>alliberar</strong> per fer espai, o cancel·la:
+    </p>
+    <div class="fil-modal-list" id="filModalList"></div>
+    <div class="mac">
+      <button class="btn" onclick="closeFilModal(true)">Cancel·lar (mantenir com estava)</button>
+      <button class="btn primary" id="filModalOk" onclick="applyFilModal()" disabled>Alliberar seleccionada</button>
+    </div>
+  </div>
+</div>
+<script src="atletes-data.js"></script>
+<script src="shared.js"></script>
+<script>
+let athletes=[], simState={}, excluded=[], refCampeonats={};
+let pmCtx=null; // {nom, ri, prova}
+
+// ── Proves oficials Campionat d'Espanya Master Clubs 2026 ──
+// 19 individuals + 2 relleus (4 atletes cadascun) = 27 places totals
+// Mínim 75% = 21 places cobertes per no ser descalificades
+const CAMP_PROVES_IND = [
+  "100m","200m","400m","800m","1500m","3000m",
+  "3000m marxa","2000m obstacles",
+  "Tanques Altes","Tanques Baixes",
+  "Salt alçada","Salt llargada","Triple salt","Salt perxa",
+  "Llançament pes","Llançament disc","Llançament martell","Martell Pesat","Llançament javelina"
+]; // 19 individuals
+const CAMP_PROVES_REL = ["Relleu 4x100","Relleu 4x400"]; // 2 relleus × 4 atletes = 8 places
+const CAMP_PROVES = [...CAMP_PROVES_IND, ...CAMP_PROVES_REL];
+const TOTAL_PLACES = 19 + 8; // 27
+const MIN_PLACES   = Math.ceil(TOTAL_PLACES * 0.75); // 21
+
+// ── Versió pública: override de totes les funcions de storage ──
+// No hi ha localStorage ni window.storage — tot en memòria
+async function loadAthletes(){ return JSON.parse(JSON.stringify(ATLETES_DATA)); }
+async function saveAthletes(){}
+async function loadRefCampeonats(){ return REF_CAMPEONATS_DEFAULT; }
+async function saveRefCampeonats(){}
+async function loadSimState(){ return {}; }
+async function saveSimState(s){ simState=s; }
+async function loadRelState(){ return {}; }
+async function saveRelState(s){ simRelState=s; }
+async function loadExcluded(){ return []; }
+async function saveExcluded(){}
+
+// ── Init (versió pública) ──
+async function init(){
+  document.getElementById('lod').style.display='flex';
+  athletes = JSON.parse(JSON.stringify(ATLETES_DATA));
+  athletes.sort((a,b)=>{
+    if(!!a.filial!==!!b.filial)return a.filial?1:-1;
+    return a.nom.localeCompare(b.nom,'ca');
+  });
+  simState={};simRelState={};excluded=[];
+  refCampeonats = REF_CAMPEONATS_DEFAULT;
+  document.getElementById('lod').style.display='none';
+  render();
+}
+async function resetSim(){
+  if(!confirm('Reiniciar simulació?'))return;
+  simState={};simRelState={};
+  render();showToast('Reset ✓');
+}
+
+// En la versió pública, guardar és només en memòria (no localStorage)
+async function saveSimState(s){simState=s;}
+async function saveRelState(s){simRelState=s;}
+
+// ── Helpers ───────────────────────────────────────────────
+function e(s){return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+function aObj(nom){return athletes.find(a=>a.nom===nom);}
+function gst(nom){
+  if(!simState[nom])simState[nom]=[{prova:'—',pct:null,man:false},{prova:'—',pct:null,man:false}];
+  while(simState[nom].length<2)simState[nom].push({prova:'—',pct:null,man:false});
+  return simState[nom];
+}
+
+// Relleus: simRelState[prova] = [nom1, nom2, nom3, nom4] (null si buit)
+let simRelState = {}; // { "Relleu 4x100": [nom|null, ...x4] }
+function grel(prova){
+  if(!simRelState[prova])simRelState[prova]=[null,null,null,null];
+  while(simRelState[prova].length<4)simRelState[prova].push(null);
+  return simRelState[prova];
+}
+function isReleu(p){return p&&(p==='Relleu 4x100'||p==='Relleu 4x400');}
+function bestPct(a,prova,row){
+  if(!prova||prova==='—')return null;
+  if(row&&row.pct!==null&&row.pct!==undefined)return row.pct;
+  const ms=(a.marques||[]).filter(m=>m.prova===prova);
+  const ps=ms.map(m=>calcPct(m.prova,m.marca,a.dob,m.any)).filter(p=>p!==null);
+  return ps.length?Math.max(...ps):null;
+}
+function suggs(a){
+  const bP={};
+  (a.marques||[]).forEach(m=>{
+    const p=calcPct(m.prova,m.marca,a.dob,m.any);
+    if(p&&(!bP[m.prova]||p>bP[m.prova]))bP[m.prova]=p;
+  });
+  return Object.entries(bP).sort((a,b)=>b[1]-a[1]);
+}
+function covMap(){
+  const m={};
+  // Proves individuals
+  athletes.forEach(a=>{
+    if(excluded.includes(a.nom))return;
+    gst(a.nom).forEach(r=>{
+      if(r.prova&&r.prova!=='—'&&!isReleu(r.prova)){if(!m[r.prova])m[r.prova]=[];m[r.prova].push(a.nom);}
+    });
+  });
+  // Relleus
+  CAMP_PROVES_REL.forEach(rel=>{
+    const atletes=grel(rel).filter(n=>n&&!excluded.includes(n));
+    if(atletes.length>0){m[rel]=atletes;}
+  });
+  return m;
+}
+function totFil(){
+  // Proves individuals de filials (excloent slots de relleu, que es compten a part)
+  let t=athletes.filter(a=>a.filial&&!excluded.includes(a.nom))
+    .reduce((s,a)=>s+gst(a.nom).filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova)).length,0);
+  // Participació de filials en relleus (1 prova per atleta per relleu)
+  CAMP_PROVES_REL.forEach(rel=>{
+    grel(rel).forEach(n=>{
+      if(n&&!excluded.includes(n)){const a=aObj(n);if(a&&a.filial)t++;}
+    });
+  });
+  return t;
+}
+function nProv(nom){
+  // Proves individuals
+  let n=gst(nom).filter(r=>r.prova&&r.prova!=='—').length;
+  // Participació en relleus
+  CAMP_PROVES_REL.forEach(rel=>{if(grel(rel).includes(nom))n++;});
+  return n;
+}
+
+// ── Render ────────────────────────────────────────────────
+function render(){renderBlocks();renderProvPanel();updateSummary();}
+
+function renderBlocks(){
+  const cont=document.getElementById('blocks');
+  if(!athletes.length){
+    cont.innerHTML=`<div class="empty"><div class="ic">🏃</div><p><a href="atletas.html" style="color:var(--blue);">Ves a Atletes</a> per afegir-les</p></div>`;
+    return;
+  }
+  const cm=covMap(), tf=totFil();
+  const nFA=athletes.filter(a=>a.filial&&!excluded.includes(a.nom)).length;
+
+  // Mapa: per a cada atleta, en quin relleu participa (si és el cas)
+  // relMap[nom] = "Relleu 4x100" | "Relleu 4x400" | null
+  const relMap={};
+  CAMP_PROVES_REL.forEach(rel=>{
+    grel(rel).forEach(n=>{ if(n) relMap[n]=rel; });
+  });
+
+  cont.innerHTML=athletes.map((a,idx)=>{
+    const ex=excluded.includes(a.nom), st=gst(a.nom);
+    const cat=getCat(a.dob), ed=getEdatActual(a.dob), fil=!!a.filial;
+    const sg=suggs(a);
+    const relActual=relMap[a.nom]||null; // relleu on participa (si és el cas)
+    let pts=0;
+
+    // Slot 0 i slot 1: proves individuals (inclou relleu com a opció)
+    // Si ja participa en un relleu, un dels slots mostra el relleu (readonly visual)
+    const rows=st.slice(0,2).map((row,ri)=>{
+      const esRelleuRow = isReleu(row.prova);
+      const pct = esRelleuRow ? null : bestPct(a,row.prova,row);
+      const p   = ex||esRelleuRow ? 0 : estPts(row.prova,pct,refCampeonats);
+      if(!esRelleuRow) pts+=p;
+      const pd  = pct!==null?pct.toFixed(2):'';
+
+      // Opcions: totes les proves individuals + els 2 relleus
+      const opts=PROVES.map(pr=>`<option value="${pr}" ${row.prova===pr?'selected':''}>${pr}</option>`).join('');
+
+      if(esRelleuRow){
+        // Slot ocupat per un relleu → mostrar readonly, botó per treure
+        const rComplet = grel(row.prova).filter(n=>n&&!excluded.includes(n)).length>=4;
+        return `<div class="pr">
+          <select class="ps" style="border-color:#7c3aed;background:#f5f3ff;" disabled>
+            <option>${row.prova}</option>
+          </select>
+          <div class="pct-wrap">
+            <span style="font-size:0.7rem;color:#7c3aed;padding:0 4px;">${rComplet?'✓ 4pts':'incomplet'}</span>
+          </div>
+          <span class="pp" style="background:#ede9fe;color:#7c3aed;border-color:#c4b5fd;margin:auto;">R</span>
+          <button class="bi" onclick="clrRelSlot('${e(a.nom)}','${e(row.prova)}')" title="Treure del relleu">×</button>
+        </div>`;
+      }
+
+      return `<div class="pr">
+        <select class="ps${row.man?' man':''}" onchange="upProv('${e(a.nom)}',${ri},this.value)" ${ex?'disabled':''}>
+          ${opts}
+        </select>
+        <div class="pct-wrap">
+          <input class="pi${row.pct!==null?' man':''}" type="number" min="0" max="105" step="0.01"
+            value="${pd}" placeholder="% auto" readonly
+            title="${row.pct!==null?'% manual · edita amb ✏️':'% calculat de marques · ✏️ per previsió'}">
+          <button class="pencil-btn" title="Previsió manual"
+            onclick="openPM('${e(a.nom)}',${ri},'${e(row.prova)}')"
+            ${ex||row.prova==='—'?'disabled':''}>✏️</button>
+        </div>
+        <span class="pp pp${p}" style="margin:auto;">${p}</span>
+        <button class="bi" onclick="clrRow('${e(a.nom)}',${ri})" title="Treure">×</button>
+      </div>`;
+    }).join('');
+
+    const sgHTML=sg.length?`<div class="sugg-row"><span style="font-weight:500;">Marques:</span>${
+      sg.filter(([pr])=>!isReleu(pr)).map(([pr,pc])=>{
+        const cov=cm[pr]&&!cm[pr].includes(a.nom);
+        return `<span class="sp${cov?' tk':''}" onclick="${cov?'':e(`asSugg('${e(a.nom)}','${e(pr)}',${pc})`)}"
+          title="${pr}: ${pc.toFixed(1)}%${cov?' (ja coberta)':''}"
+          >${pr.replace('Llançament ','').replace('Salt ','')} <b>${pc.toFixed(0)}%</b></span>`;
+      }).join('')
+    }</div>`:'';
+
+    // Errors: compta proves individuals + relleu (si en té)
+    const nPInd=st.filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova)).length;
+    const nPRel=st.filter(r=>isReleu(r.prova)).length;
+    const nPTotal=nPInd+nPRel;
+    const errs=[];
+    if(nPTotal>2)errs.push(`⛔ Màxim 2 proves/atleta — té ${nPInd} individual${nPInd!==1?'s':''} + ${nPRel} relleu`);
+    if(fil&&tf>4&&nPTotal>0)errs.push('⛔ Filials superen 4 proves en total');
+    if(fil&&nFA>4)errs.push(`⛔ ${nFA} filials al club (màx. 4)`);
+    const errH=errs.map(e=>`<div class="err-row">${e}</div>`).join('');
+
+    return `<div class="ab ${ex?'excl':''} ${nPTotal>2||(fil&&tf>4&&nPTotal>0)?'err':''}" id="ab${idx}">
+      <div class="ab-head">
+        <div class="av">${initials(a.nom)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="ai-nom">${a.nom}${fil?` <span class="fb">FILIAL</span>`:''}</div>
+          <div class="ai-sub">${cat||'?'} · ${ed?ed+'a':''} ${a.notes?'· '+a.notes:''}${relActual?` · <span style="color:#7c3aed;font-weight:600;">🔄 ${relActual}</span>`:''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+          <button class="xt ${ex?'off':'on'}" onclick="togExcl('${e(a.nom)}',${idx})">${ex?'✗ Exclosa':'✓ Activa'}</button>
+          <div class="a-pts">${ex?'—':pts+' pts'}</div>
+        </div>
+      </div>
+      <div class="pr-rows">${rows}${errH}${sgHTML}</div>
+    </div>`;
+  }).join('');
+
+  // ── Secció inferior: estat dels relleus (resum automàtic) ──
+  const relHTML = CAMP_PROVES_REL.map(rel=>{
+    const membres = grel(rel).filter(n=>n&&!excluded.includes(n));
+    const complet = membres.length>=4;
+    const borderColor = complet?'#16a34a':membres.length>0?'#dc2626':'#d4dde8';
+    const bgColor     = complet?'#f0fdf4':membres.length>0?'#fee2e2':'#f8fafc';
+    const textColor   = complet?'#166534':membres.length>0?'#991b1b':'#94a3b8';
+    const icon        = complet?'✅':'⚠️';
+    const membresText = membres.length
+      ? membres.map(n=>n.split(' ')[0]).join(', ')
+      : '— cap atleta assignada';
+
+    return `<div style="border:2px solid ${borderColor};background:${bgColor};border-radius:9px;padding:0.55rem 0.85rem;margin-bottom:0.45rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div>
+          <div style="font-weight:700;font-size:0.82rem;color:${textColor};">${icon} ${rel} — ${membres.length}/4 atletes${complet?' · 4 PUNTS':membres.length>0?' · 0 punts (incomplet)':''}</div>
+          <div style="font-size:0.71rem;color:${textColor};margin-top:2px;opacity:0.85;">${membresText}</div>
+        </div>
+        <div style="font-size:1.1rem;font-weight:800;color:${textColor};">${complet?'4p':'0p'}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  cont.innerHTML += `<div style="margin-top:1rem;padding-top:0.9rem;border-top:2px dashed #c4b5fd;">
+    <div style="font-size:0.82rem;font-weight:600;color:#5b21b6;margin-bottom:0.5rem;">🔄 Relleus — assigna'ls des del desplegable de cada atleta · 4 punts si complet (4/4)</div>
+    ${relHTML}
+    <div style="font-size:0.69rem;color:var(--text-muted);margin-top:4px;">El relleu compta com <strong>1 de les 2 proves màximes</strong> de l'atleta.</div>
+  </div>`;
+}
+
+function renderProvPanel(){
+  const cm=covMap();
+
+  // Individuals
+  const indHTML = CAMP_PROVES_IND.map(p=>{
+    const who=cm[p]; const cov=who&&who.length>0;
+    let pts=0;
+    if(cov){const a=aObj(who[0]);if(a){const row=gst(who[0]).find(r=>r.prova===p);pts=estPts(p,bestPct(a,p,row),refCampeonats);}}
+    return `<div class="pi-row ${cov?'cov':'free'}">
+      <span class="pi-name">${p}</span>
+      ${cov?`<span class="pi-who">${who[0].split(' ')[0]}</span><span class="pi-pts ok">${pts}p</span>`
+           :`<span class="pi-pts no">—</span>`}
+    </div>`;
+  }).join('');
+
+  // Relleus: només compta places i punts si complet (4/4)
+  const relHTML = CAMP_PROVES_REL.map(p=>{
+    const who=grel(p).filter(n=>n&&!excluded.includes(n));
+    const n=who.length; const complet=n>=4; const cov=n>0;
+    return `<div class="pi-row ${complet?'cov':cov?'inc':'free'}">
+      <span class="pi-name">${p}</span>
+      ${cov
+        ? complet
+          ? `<span class="pi-who">✓ 4/4</span><span class="pi-pts ok">4p</span>`
+          : `<span class="pi-who" style="color:#dc2626;">${n}/4 ⚠️</span><span class="pi-pts" style="color:#dc2626;">0p</span>`
+        : `<span class="pi-pts no">—</span>`}
+    </div>`;
+  }).join('');
+
+  document.getElementById('provPanel').innerHTML=
+    `<div style="font-size:0.65rem;font-weight:600;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;">Individuals (19)</div>`
+    + indHTML
+    + `<div style="font-size:0.65rem;font-weight:600;color:var(--text-muted);margin-top:6px;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;">Relleus (4 atletes cadascun)</div>`
+    + relHTML;
+
+  // "Proves lliures" = individuals sense cobrir + relleus sense cap atleta
+  const nLliuresInd=CAMP_PROVES_IND.filter(p=>!cm[p]||cm[p].length===0).length;
+  const nLliuresRel=CAMP_PROVES_REL.filter(p=>{const w=grel(p).filter(n=>n&&!excluded.includes(n));return w.length===0;}).length;
+  document.getElementById('sLli').textContent=nLliuresInd+nLliuresRel;
+}
+
+// ── Accions ───────────────────────────────────────────────
+function upRel(rel, slot, nom){
+  const r=grel(rel);
+  // Si este atleta ya está en otro slot del mismo relleu, treure'l
+  r.forEach((n,i)=>{if(n===nom&&i!==slot&&nom)r[i]=null;});
+  r[slot]=nom||null;
+  simRelState[rel]=r;
+  saveRelState(simRelState);
+  render();
+  showToast(nom?`✓ ${nom.split(' ')[0]} → ${rel}`:`Slot ${slot+1} alliberat de ${rel}`);
+}
+
+// Treure atleta del relleu des del seu propi bloc
+function clrRelSlot(nom, rel){
+  const r=grel(rel);
+  const idx=r.indexOf(nom);
+  if(idx>=0)r[idx]=null;
+  simRelState[rel]=r;
+  // Netejar el slot del simState de l'atleta
+  const st=gst(nom);
+  st.forEach((row,ri)=>{ if(row.prova===rel) st[ri]={prova:'—',pct:null,man:false}; });
+  simState[nom]=st;
+  saveRelState(simRelState); saveSimState(simState);
+  render();
+  showToast(`✓ ${nom.split(' ')[0]} tret del ${rel}`);
+}
+
+function upProv(nom,ri,val){
+  const st=gst(nom);
+  const provaAnterior=st[ri]?.prova;
+
+  // Si la prova anterior era un relleu, treure l'atleta d'aquell relleu
+  if(isReleu(provaAnterior)){
+    const r=grel(provaAnterior);
+    const ix=r.indexOf(nom); if(ix>=0)r[ix]=null;
+    simRelState[provaAnterior]=r;
+  }
+
+  // Si la nova prova és un relleu
+  if(isReleu(val)){
+    // Comprova que l'atleta no estigui ja en un altre relleu
+    const relActual=Object.entries(simRelState).find(([,arr])=>arr.includes(nom));
+    if(relActual && relActual[0]!==val){
+      showToast(`⚠️ ${nom.split(' ')[0]} ja està al ${relActual[0]}`);
+      render(); return;
+    }
+    // Comprova que no té ja 2 proves individuals
+    const nInd=st.filter((r,i)=>i!==ri&&r.prova&&r.prova!=='—'&&!isReleu(r.prova)).length;
+    if(nInd>=2){ showToast('⚠️ Ja té 2 proves individuals — no pot afegir relleu'); render(); return; }
+    // Afegir al relleu (primer slot lliure)
+    const r=grel(val);
+    // Evitar duplicat
+    if(!r.includes(nom)){
+      const slot=r.findIndex(n=>!n);
+      if(slot>=0){ r[slot]=nom; simRelState[val]=r; }
+      else{ showToast(`⚠️ ${val} ja té 4 atletes`); render(); return; }
+    }
+    st[ri]={prova:val,pct:null,man:false};
+    simState[nom]=st;
+    saveRelState(simRelState); saveSimState(simState);
+    // Comprovar límit filials (igual que per proves individuals)
+    const a=aObj(nom);
+    if(a&&a.filial&&totFil()>4){
+      chkFil(nom,ri,val);
+      return; // chkFil ja fa render intern
+    }
+    render();
+    showToast(`✓ ${nom.split(' ')[0]} → ${val}`);
+    return;
+  }
+
+  // Prova individual normal
+  st[ri]={prova:val,pct:null,man:false};
+  simState[nom]=st;
+  if(val&&val!=='—'){
+    dynResolve(nom,ri,val);
+    chkFil(nom,ri,val);
+  }
+  saveRelState(simRelState); saveSimState(simState); render();
+}
+
+// Quan A (slot ri) pren una prova que tenia B → desplaça B a una alternativa
+// També neteja si el mateix atleta tenia la mateixa prova en un altre slot
+function dynResolve(nomA, riA, prova){
+  athletes.forEach(a=>{
+    if(excluded.includes(a.nom))return;
+    const st=gst(a.nom);
+    st.forEach((row,ri)=>{
+      if(row.prova!==prova)return;
+      // Ignorar el slot que acabem d'assignar
+      if(a.nom===nomA&&ri===riA)return;
+      // És un duplicat: desplaçar
+      const alt=bestAlt(a,prova,nomA);
+      if(alt){
+        st[ri]={prova:alt.prova,pct:null,man:false};
+        showToast(`↺ ${a.nom.split(' ')[0]}: ${prova} → ${alt.prova}`);
+      } else {
+        st[ri]={prova:'—',pct:null,man:false};
+        showToast(`↺ ${prova} alliberat de ${a.nom.split(' ')[0]}`);
+      }
+      simState[a.nom]=st;
+    });
+  });
+}
+
+// Millor prova alternativa per a l'atleta `a` quan se la desplaça de `provaOcup`
+// Construeix el mapa d'ocupació excloent el propi slot conflictiu de `a`
+function bestAlt(a, provaOcup, nomQueAgafa){
+  // Mapa de proves ja ocupades per ALTRES atletes (no per `a`)
+  const ocupades = new Set();
+  athletes.forEach(x=>{
+    if(x.nom===a.nom||excluded.includes(x.nom))return;
+    gst(x.nom).forEach(r=>{
+      if(r.prova&&r.prova!=='—')ocupades.add(r.prova);
+    });
+  });
+  // Les proves que JA té `a` en altres slots (no el conflictiu)
+  const propies = new Set(
+    gst(a.nom)
+      .filter(r=>r.prova&&r.prova!=='—'&&r.prova!==provaOcup)
+      .map(r=>r.prova)
+  );
+  const tf=totFil();
+
+  for(const [p,pc] of suggs(a)){
+    if(p===provaOcup)continue;       // no tornar a la mateixa
+    if(propies.has(p))continue;      // ja la té en un altre slot
+    if(ocupades.has(p))continue;     // ja la té una altra atleta
+    if(a.filial&&tf>=4)continue;     // límit filials
+    return{prova:p,pct:pc};
+  }
+  return null;
+}
+
+// ── Límit filials: consulta l'usuari ─────────────────────────
+let filModalCtx = null; // { nomAfeg, ri, prova }
+
+function chkFil(nomAfeg, ri, provaAfegida){
+  const a = aObj(nomAfeg);
+  if(!a || !a.filial) return;
+  if(totFil() <= 4) return;
+
+  // Construeix llista de proves filials actuals (excloent la que s'acaba d'afegir)
+  const cands = [];
+  athletes.filter(x => x.filial && !excluded.includes(x.nom)).forEach(x => {
+    // Proves individuals
+    gst(x.nom).forEach((row, rxri) => {
+      if(!row.prova || row.prova === '—' || isReleu(row.prova)) return;
+      if(x.nom === nomAfeg && rxri === ri) return;
+      const pct = bestPct(x, row.prova, row);
+      const pts = estPts(row.prova, pct, refCampeonats);
+      cands.push({ nom: x.nom, ri: rxri, prova: row.prova, pts, pct, esReleu: false });
+    });
+    // Participació en relleus
+    CAMP_PROVES_REL.forEach(rel=>{
+      const membres=grel(rel);
+      const slot=membres.indexOf(x.nom);
+      if(slot<0)return;
+      // No oferir la mateixa prova que s'acaba d'afegir com a opció
+      if(x.nom===nomAfeg && isReleu(provaAfegida) && rel===provaAfegida) return;
+      cands.push({ nom: x.nom, ri: -1, prova: rel, pts: 0, pct: null, esReleu: true, slot });
+    });
+  });
+
+  if(!cands.length){
+    // No hi ha res a alliberar: revertir l'assignació nova
+    gst(nomAfeg)[ri] = {prova:'—', pct:null, man:false};
+    showToast('⚠️ Ja hi ha 4 proves de filials, no es pot afegir més.');
+    return;
+  }
+
+  // Mostra el modal per que l'usuari decideixi
+  filModalCtx = { nomAfeg, ri, provaAfegida };
+  document.getElementById('filModalNom').textContent = nomAfeg;
+  document.getElementById('filModalList').innerHTML = cands.map((c, ci) =>
+    `<div class="fil-modal-row" id="fmr${ci}" onclick="selFilRow(${ci})"
+      data-nom="${e(c.nom)}" data-ri="${c.ri}" data-es-releu="${c.esReleu}" data-slot="${c.esReleu?c.slot:-1}" data-prova="${e(c.prova)}">
+      <span><b>${c.nom.split(' ')[0]}</b> · ${c.prova}${c.esReleu?' 🔄':''}</span>
+      <span style="font-size:0.72rem;color:var(--text-muted);">${c.pct!==null?c.pct.toFixed(1)+'%':c.esReleu?'relleu':''} · ${c.pts}pts</span>
+    </div>`
+  ).join('');
+  document.getElementById('filModalOk').disabled = true;
+  document.getElementById('filModal').classList.add('open');
+}
+
+let filModalSel = null;
+function selFilRow(ci){
+  document.querySelectorAll('.fil-modal-row').forEach(r => r.classList.remove('sel'));
+  document.getElementById(`fmr${ci}`).classList.add('sel');
+  const row = document.getElementById(`fmr${ci}`);
+  filModalSel = { nom: row.dataset.nom, ri: parseInt(row.dataset.ri), esReleu: row.dataset.esReleu==='true', slot: parseInt(row.dataset.slot||'-1'), prova: row.dataset.prova };
+  document.getElementById('filModalOk').disabled = false;
+}
+
+function applyFilModal(){
+  if(!filModalSel) return;
+  const { nom, ri, esReleu, slot, prova } = filModalSel;
+  if(esReleu){
+    // Alliberar del relleu
+    const r=grel(prova);
+    const ix=slot>=0?slot:r.indexOf(nom);
+    if(ix>=0)r[ix]=null;
+    simRelState[prova]=r;
+    // Netejar el slot del simState de l'atleta
+    const st=gst(nom);
+    st.forEach((row,i)=>{ if(row.prova===prova) st[i]={prova:'—',pct:null,man:false}; });
+    simState[nom]=st;
+    saveRelState(simRelState);
+    showToast(`✓ ${nom.split(' ')[0]} alliberada del ${prova}`);
+  } else {
+    if(simState[nom] && simState[nom][ri]){
+      const pr = simState[nom][ri].prova;
+      simState[nom][ri] = {prova:'—', pct:null, man:false};
+      showToast(`✓ ${pr} alliberada de ${nom.split(' ')[0]}`);
+    }
+  }
+  closeFilModal(false);
+}
+
+function closeFilModal(revert){
+  if(revert && filModalCtx){
+    const { nomAfeg, ri, provaAfegida } = filModalCtx;
+    // Revertir la prova individual o el relleu que va provocar el conflicte
+    if(isReleu(provaAfegida)){
+      const r=grel(provaAfegida);
+      const ix=r.indexOf(nomAfeg); if(ix>=0)r[ix]=null;
+      simRelState[provaAfegida]=r;
+      saveRelState(simRelState);
+    }
+    if(simState[nomAfeg] && simState[nomAfeg][ri]){
+      simState[nomAfeg][ri] = {prova:'—', pct:null, man:false};
+    }
+  }
+  document.getElementById('filModal').classList.remove('open');
+  filModalCtx = null; filModalSel = null;
+  saveSimState(simState);
+  render();
+}
+document.getElementById('filModal').addEventListener('click', ev => {
+  if(ev.target === document.getElementById('filModal')) closeFilModal(true);
+});
+
+function upPct(nom,ri,val){
+  const st=gst(nom);
+  st[ri].pct=val===''||val===null?null:parseFloat(val);
+  st[ri].man=st[ri].pct!==null;
+  simState[nom]=st;saveSimState(simState);updateSummary();renderProvPanel();
+}
+
+function clrRow(nom,ri){
+  const st=gst(nom), pA=st[ri]?.prova;
+  st[ri]={prova:'—',pct:null,man:false};simState[nom]=st;
+  // Si era un relleu, treure'l de simRelState també
+  if(pA&&isReleu(pA)){
+    const r=grel(pA);
+    const ix=r.indexOf(nom); if(ix>=0)r[ix]=null;
+    simRelState[pA]=r;
+    saveRelState(simRelState);
+  } else if(pA&&pA!=='—'){
+    const mb=millorPer(pA,nom);
+    if(mb){const sm=gst(mb.nom),sl=sm.findIndex(r=>!r.prova||r.prova==='—');
+      if(sl>=0){sm[sl]={prova:pA,pct:null,man:false};simState[mb.nom]=sm;showToast(`✓ ${pA} → ${mb.nom.split(' ')[0]} (${mb.pct.toFixed(1)}%)`);}
+    }
+  }
+  saveSimState(simState);render();
+}
+
+// Millor atleta disponible per cobrir una prova alliberada
+function millorPer(prova,nomExcl){
+  const cm=covMap(),tf=totFil();let mb=null;
+  athletes.forEach(a=>{
+    if(a.nom===nomExcl||excluded.includes(a.nom))return;
+    if(cm[prova]&&cm[prova].includes(a.nom))return;
+    if(nProv(a.nom)>=2)return;
+    if(a.filial&&tf>=4)return;
+    const pct=bestPct(a,prova,null);if(pct===null)return;
+    if(!mb||pct>mb.pct)mb={nom:a.nom,pct};
+  });
+  return mb;
+}
+
+function asSugg(nom,prova,pct){
+  const st=gst(nom),sl=st.findIndex(r=>!r.prova||r.prova==='—');
+  if(sl<0){showToast('Ja té 2 proves assignades');return;}
+  st[sl]={prova,pct:null,man:false};simState[nom]=st;
+  dynResolve(nom,sl,prova);chkFil(nom,sl,prova);
+  saveSimState(simState);render();
+}
+
+function togExcl(nom){
+  const i=excluded.indexOf(nom);if(i>=0)excluded.splice(i,1);else excluded.push(nom);
+  saveExcluded(excluded);render();
+}
+
+// ── Modal previsió ────────────────────────────────────────
+function openPM(nom,ri,prova){
+  if(!prova||prova==='—')return;
+  pmCtx={nom,ri,prova,_pct:null};
+  document.getElementById('pmCtx').textContent=`${nom} · ${prova}`;
+  document.getElementById('pmM').value='';document.getElementById('pmD').value='';
+  document.getElementById('pmP').textContent='—';document.getElementById('pmPts').textContent='—';
+  document.getElementById('pm').classList.add('open');
+  document.getElementById('pmM').focus();
+}
+function closePM(){document.getElementById('pm').classList.remove('open');pmCtx=null;}
+function calcPM(){
+  if(!pmCtx)return;
+  const marca=document.getElementById('pmM').value.trim();
+  const a=aObj(pmCtx.nom);if(!a||!marca)return;
+  document.getElementById('pmD').value='';
+  const pct=calcPct(pmCtx.prova,marca,a.dob,new Date().getFullYear());
+  if(pct!==null){
+    document.getElementById('pmP').textContent=pct.toFixed(2)+'%';
+    document.getElementById('pmPts').textContent=estPts(pmCtx.prova,pct,refCampeonats)+' pts';
+    pmCtx._pct=pct;
+  }else{document.getElementById('pmP').textContent='⚠️ No calculable';pmCtx._pct=null;}
+}
+function calcPMD(){
+  if(!pmCtx)return;
+  const v=parseFloat(document.getElementById('pmD').value);
+  document.getElementById('pmM').value='';
+  if(!isNaN(v)){
+    document.getElementById('pmP').textContent=v.toFixed(2)+'%';
+    document.getElementById('pmPts').textContent=estPts(pmCtx.prova,v,refCampeonats)+' pts';
+    pmCtx._pct=v;
+  }
+}
+function applyPM(){
+  if(!pmCtx||pmCtx._pct===null||pmCtx._pct===undefined){alert('Introdueix una marca o % vàlid.');return;}
+  const st=gst(pmCtx.nom);st[pmCtx.ri].pct=pmCtx._pct;st[pmCtx.ri].man=true;simState[pmCtx.nom]=st;
+  saveSimState(simState);closePM();render();showToast(`✓ Previsió: ${pmCtx._pct.toFixed(2)}%`);
+}
+document.getElementById('pm').addEventListener('click',ev=>{if(ev.target===document.getElementById('pm'))closePM();});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
+
+// ── Optimitzador ──────────────────────────────────────────
+async function runOptimizer(){
+  // ── REGLES ──────────────────────────────────────────────────────────────
+  // · Cada atleta: màx 2 proves (individuals o relleus, en total)
+  // · Filials actives al club: màx 4
+  // · Proves assignades a filials: màx 4 en total entre totes
+  //   (ex vàlids: 2+1+1, 2+2, 1+1+1+1 — NO: 2+2+1 = 5)
+  // ────────────────────────────────────────────────────────────────────────
+  if(!athletes.length){showToast('No hi ha atletes');return;}
+  showToast('⏳ Calculant...');await new Promise(r=>setTimeout(r,60));
+
+  // Reset totes les assignacions
+  const ns={};
+  athletes.forEach(a=>{
+    ns[a.nom]=[{prova:'—',pct:null,man:false},{prova:'—',pct:null,man:false}];
+  });
+
+  const act = athletes.filter(a=>!excluded.includes(a.nom));
+
+  // Construïm totes les opcions atleta×prova (individuals primer, relleus al final)
+  const ops=[];
+  act.forEach(a=>{
+    suggs(a).forEach(([prova,pct])=>{
+      const esRelleu = CAMP_PROVES_REL.includes(prova);
+      ops.push({nom:a.nom,fil:!!a.filial,prova,pct,esRelleu,
+                pts:estPts(prova,pct,refCampeonats)});
+    });
+  });
+  // Ordena: individuals abans que relleus, dins de cada grup per pts DESC, pct DESC
+  ops.sort((a,b)=>{
+    if(a.esRelleu !== b.esRelleu) return a.esRelleu?1:-1;
+    return b.pts-a.pts || b.pct-a.pct;
+  });
+
+  const cob={};   // prova→nom (cada prova individual agafada per 1 atleta)
+  const nPA={};   // nom→quantes proves té assignades (màx 2)
+  let tf=0;       // total proves assignades a filials (màx 4)
+  act.forEach(a=>{nPA[a.nom]=0;});
+
+  // ── Passada única: greedy respectant totes les regles ──
+  for(const op of ops){
+    const{nom,fil,prova,esRelleu}=op;
+
+    // Regla: un individu no pot repetir prova (excepte relleus on diverses atletes hi van)
+    if(!esRelleu && cob[prova]) continue;
+
+    // Regla: màx 2 proves per atleta
+    if(nPA[nom]>=2) continue;
+
+    // Regla filials: màx 4 proves en total entre totes les filials
+    if(fil && tf>=4) continue;
+
+    // Assigna al slot lliure (0 o 1)
+    const slot = nPA[nom]; // 0 si és la primera, 1 si és la segona
+    ns[nom][slot]={prova,pct:null,man:false};
+    if(!esRelleu) cob[prova]=nom;
+    nPA[nom]++;
+    if(fil) tf++;
+  }
+
+  simState=ns;
+  await saveSimState(simState);
+  render();
+  document.getElementById('sb').classList.add('show');
+  showToast('▶ Simulació completada!');
+}
+
+function updateSummary(){
+  let tot=0,nAtl=0;const rows=[],pm2={};
+  const filA=athletes.filter(a=>a.filial&&!excluded.includes(a.nom));
+  const nFC=filA.length;
+  const pFil=totFil();
+
+  // Proves individuals
+  athletes.forEach(a=>{
+    if(excluded.includes(a.nom))return;
+    const st=gst(a.nom);let ha=false;
+    st.slice(0,2).forEach(row=>{
+      if(!row.prova||row.prova==='—')return;
+      if(isReleu(row.prova))return; // relleus es tracten a part
+      ha=true;
+      const pct=bestPct(a,row.prova,row),pts=estPts(row.prova,pct,refCampeonats),pos=estPos(row.prova,pct,refCampeonats);
+      tot+=pts;
+      if(!pm2[row.prova])pm2[row.prova]=[];pm2[row.prova].push(a.nom);
+      rows.push({nom:a.nom,prova:row.prova,pct,pts,pos,fil:!!a.filial,man:!!row.man});
+    });
+    if(ha)nAtl++;
+  });
+
+  // Relleus: 4 punts si complet (4 atletes), sinó incomplet
+  CAMP_PROVES_REL.forEach(rel=>{
+    const membres=grel(rel).filter(n=>n&&!excluded.includes(n));
+    if(!membres.length)return;
+    const complet=membres.length>=4;
+    const pts=complet?4:0; // 0 punts si relleu incomplet (però ocupa placa)
+    tot+=pts;
+    pm2[rel]=membres;
+    membres.forEach(nom=>{
+      const a=aObj(nom);if(!a)return;
+      if(!rows.find(r=>r.nom===nom&&r.prova===rel)){
+        rows.push({nom,prova:rel,pct:null,pts:complet?1:0,pos:'—',fil:!!a.filial,man:false,releu:true,complet});
+      }
+    });
+    // Afegim 1 cop el relleu al resum de puntuació
+    rows.push({nom:`Relleu (${membres.map(n=>n.split(' ')[0]).join(', ')})`,prova:rel,pct:null,pts,pos:complet?'—':'⚠️',fil:false,man:false,releu:true,complet,isGroup:true});
+  });
+
+  // ── Càlcul places (regla 75%) ──
+  // Individuals: 1 plaça per prova coberta
+  const indCov = CAMP_PROVES_IND.filter(p=>pm2[p]&&pm2[p].length>0).length;
+  // Relleus: 4 places i 4 punts NOMÉS si complet (4/4)
+  let relPlaces = 0;
+  CAMP_PROVES_REL.forEach(r=>{
+    const membres=grel(r).filter(n=>n&&!excluded.includes(n));
+    if(membres.length>=4) relPlaces+=4; // només si complet
+  });
+  const totalPlaces = indCov + relPlaces;
+  const pct75 = Math.round((totalPlaces / TOTAL_PLACES) * 100);
+  const quotaOk = totalPlaces >= MIN_PLACES;
+
+  document.getElementById('sTot').textContent=tot;
+  document.getElementById('totB').textContent=tot;
+  document.getElementById('sAtl').textContent=nAtl;
+  document.getElementById('sPlaces').textContent=`${totalPlaces}/${TOTAL_PLACES}`;
+  document.getElementById('sPlacesPct').textContent=`mínim ${MIN_PLACES} (75%) ${quotaOk?'✓':'⚠️'}`;
+  document.getElementById('sPlacesEl').classList.toggle('err', !quotaOk);
+
+  // Barra de progrés 75%
+  let barEl = document.getElementById('quotaBar');
+  if(!barEl){
+    const wrap=document.createElement('div');wrap.className='quota-bar-wrap';
+    wrap.innerHTML=`<div id="quotaBar" class="quota-bar"></div>`;
+    document.getElementById('sPlacesEl').appendChild(wrap);
+    barEl=document.getElementById('quotaBar');
+  }
+  const barPct=Math.min(100,Math.round((totalPlaces/TOTAL_PLACES)*100));
+  barEl.style.width=barPct+'%';
+  barEl.className='quota-bar '+(totalPlaces>=MIN_PLACES?'quota-ok':totalPlaces>=MIN_PLACES-3?'quota-warn':'quota-bad');
+
+  // Proves lliures = individuals + relleus sense cap atleta (cada relleu = 1 prova)
+  const nLliuresInd = CAMP_PROVES_IND.filter(p=>!pm2[p]||pm2[p].length===0).length;
+  const nLliuresRel = CAMP_PROVES_REL.filter(p=>{const w=grel(p).filter(n=>n&&!excluded.includes(n));return w.length===0;}).length;
+  document.getElementById('sLli').textContent=nLliuresInd+nLliuresRel;
+  document.getElementById('sFil').textContent=nFC+'/4';
+  document.getElementById('sFstat').classList.toggle('err',nFC>4);
+
+  const dups=Object.entries(pm2).filter(([p,arr])=>arr.length>1&&!CAMP_PROVES_REL.includes(p));
+  const errs=[],warns=[];
+  if(!quotaOk)errs.push(`⛔ Només ${totalPlaces}/${TOTAL_PLACES} places cobertes — mínima <strong>${MIN_PLACES}</strong> per no ser descalificades`);
+  if(nFC>4)errs.push(`⛔ ${nFC} filials al club (màx. 4)`);
+  if(pFil>4)errs.push(`⛔ Les filials fan <strong>${pFil} proves</strong> en total (màx. 4 entre totes · ex: 2+1+1 ó 2+2 ó 1+1+1+1)`);
+  dups.forEach(([p,arr])=>warns.push(`⚠️ Prova duplicada: <b>${p}</b> — ${arr.map(n=>n.split(' ')[0]).join(' + ')}`));
+  // Avisar relleus incomplets
+  CAMP_PROVES_REL.forEach(rel=>{
+    const membres=grel(rel).filter(n=>n&&!excluded.includes(n));
+    if(membres.length>0&&membres.length<4) warns.push(`⚠️ <b>${rel}</b> incomplet — ${membres.length}/4 atletes (0 punts fins completar-lo)`);
+  });
+
+  const wb=document.getElementById('wbs');wb.innerHTML='';
+  if(errs.length)wb.innerHTML+=`<div class="wb we">${errs.join('<br>')}</div>`;
+  if(warns.length)wb.innerHTML+=`<div class="wb ww">${warns.join('<br>')}</div>`;
+
+  // Taula de resultats — filtrar files "isGroup" de relleus per mostrar-los bé
+  const rowsMostrar = rows.filter(r=>!r.releu||r.isGroup);
+  document.getElementById('rb').innerHTML=rowsMostrar.sort((a,b)=>b.pts-a.pts).map(r=>{
+    const rk=r.pos===1?'r1':r.pos===2?'r2':r.pos===3?'r3':'rN';
+    const nomDisplay=r.isGroup?`<span style="font-style:italic;font-size:0.68rem;">${r.nom}</span>`:
+      `${r.nom.split(' ')[0]}${r.fil?` <span class="fb" style="font-size:0.55rem;">F</span>`:''}`;
+    const pctDisplay=r.isGroup?(r.complet?'✓ Complet':'⚠️ Incomplet'):(r.pct!==null?r.pct.toFixed(1)+'%'+(r.man?' ✏️':''):'—');
+    const posDisplay=r.isGroup?'':r.pos!=='—'?r.pos+'a':'—';
+    return `<tr>
+      <td style="font-weight:500;font-size:0.72rem;">${nomDisplay}</td>
+      <td style="font-size:0.69rem;">${r.prova}</td>
+      <td style="font-family:'Courier New',monospace;font-size:0.69rem;">${pctDisplay}</td>
+      <td>${posDisplay?`<span class="rk ${rk}">${posDisplay}</span>`:''}</td>
+      <td><span class="pp pp${r.pts}">${r.pts}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+init();
+</script>
+</body>
+</html>

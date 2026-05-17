@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pratenc AA — Referència campionats</title>
+<link rel="stylesheet" href="style.css">
+<style>
+:root{--blue-dark:#1a3a5c;--blue:#2563a8;--blue-pale:#e8f0fa;--green:#1a7a3a;--border:#d4dde8;--text:#1c2b3a;--text-muted:#6b7f93;--bg:#f4f7fb;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+header{background:var(--blue-dark);color:white;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem;}
+.header-logo{width:48px;height:48px;background:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:white;flex-shrink:0;}
+.header-text h1{font-size:1.1rem;font-weight:700;}
+.header-text .sub{font-size:0.78rem;opacity:0.75;margin-top:2px;}
+.header-right{margin-left:auto;font-size:0.75rem;opacity:0.7;}
+nav{background:var(--blue);display:flex;gap:0;padding:0 1rem;}
+nav a{color:rgba(255,255,255,0.75);text-decoration:none;padding:0.65rem 1rem;font-size:0.82rem;font-weight:500;border-bottom:3px solid transparent;transition:all 0.15s;}
+nav a:hover{color:white;background:rgba(255,255,255,0.1);}
+nav a.active{color:white;border-bottom-color:white;}
+main{padding:1.2rem;max-width:1200px;margin:0 auto;}
+.toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;}
+.toolbar h2{font-size:1rem;font-weight:600;color:var(--blue-dark);}
+.search-box{padding:0.45rem 0.85rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;width:200px;outline:none;background:white;}
+.search-box:focus{border-color:var(--blue);}
+.filters{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.2rem;}
+.filter-btn{padding:0.3rem 0.8rem;border:1.5px solid var(--border);border-radius:20px;background:white;font-size:0.78rem;font-weight:500;cursor:pointer;color:var(--text-muted);transition:all 0.15s;}
+.filter-btn:hover{border-color:var(--blue);color:var(--blue);}
+.filter-btn.active{background:var(--blue);border-color:var(--blue);color:white;}
+.ref-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;}
+.ref-card{background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.ref-card-header{padding:0.8rem 1rem 0.6rem;border-bottom:1.5px solid var(--border);background:linear-gradient(135deg,#f8fbff,#eef4ff);}
+.ref-card-header h3{font-size:0.9rem;font-weight:700;color:var(--blue-dark);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.note{font-size:0.71rem;color:var(--text-muted);margin-top:3px;line-height:1.4;}
+.note.pratenc{color:var(--green);font-weight:500;}
+.ref-table{width:100%;border-collapse:collapse;font-size:0.78rem;}
+.ref-table thead{background:var(--blue-dark);color:white;}
+.ref-table thead th{padding:0.42rem 0.6rem;text-align:center;font-weight:600;font-size:0.7rem;}
+.ref-table thead th:first-child{text-align:left;}
+.ref-table tbody tr{border-bottom:1px solid var(--border);}
+.ref-table tbody tr:hover{background:var(--blue-pale);}
+.ref-table tbody tr:last-child{border-bottom:none;}
+.ref-table td{padding:0.38rem 0.5rem;text-align:center;vertical-align:middle;}
+.ref-table td:first-child{text-align:left;}
+.pos-badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:22px;border-radius:5px;font-size:0.72rem;font-weight:700;}
+.pos-badge.p1{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.pos-badge.p2{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;}
+.pos-badge.p3{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.pos-badge.pN{background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe;}
+.pts-col{font-weight:700;color:var(--blue);font-size:0.85rem;}
+.pct-cell{display:inline-block;padding:2px 6px;border-radius:5px;font-family:'Courier New',monospace;font-size:0.73rem;font-weight:600;}
+.pct-best{background:#dcfce7;color:#15803d;}
+.pct-good{background:#dbeafe;color:#1d4ed8;}
+.pct-mid{background:#fef9c3;color:#a16207;}
+.pct-low{background:#fee2e2;color:#b91c1c;}
+.pct-empty{color:#94a3b8;font-style:italic;}
+.pratenc-row{background:#f0fdf4!important;border-left:3px solid var(--green)!important;}
+.pratenc-row:hover{background:#dcfce7!important;}
+.no-celebration{font-size:0.7rem;color:var(--text-muted);text-align:center;padding:0.6rem;font-style:italic;}
+.cat-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.64rem;font-weight:600;vertical-align:middle;text-transform:uppercase;letter-spacing:0.03em;}
+.cat-cursa{background:#dbeafe;color:#1e40af;}
+.cat-tanques{background:#fce7f3;color:#9d174d;}
+.cat-salt{background:#d1fae5;color:#065f46;}
+.cat-llanc{background:#fef3c7;color:#92400e;}
+.cat-relleu{background:#e0e7ff;color:#3730a3;}
+.cat-marxa{background:#f3e8ff;color:#6b21a8;}
+@media(max-width:500px){
+  .ref-grid{grid-template-columns:1fr;}
+  header{padding:0.7rem 1rem;}
+  .header-text h1{font-size:0.9rem;}
+  nav a{padding:0.5rem 0.7rem;font-size:0.75rem;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-logo">PA</div>
+  <div class="header-text">
+    <h1>Pratenc Associació d'Atletisme</h1>
+    <div class="sub">Referència campionats femenins · Master 1a Divisió</div>
+  </div>
+  <div class="header-right">RFEA 2022–2024</div>
+</header>
+<nav>
+  <a href="atletes-public.html">👟 Atletes</a>
+  <a href="campeonatos-public.html" class="active">📊 Campionats</a>
+  <a href="simulador-public.html">🏃 Simulador</a>
+</nav>
+<main>
+  <div class="toolbar">
+    <h2>Historial campionats 2022–2024</h2>
+    <input type="text" class="search-box" placeholder="🔍 Cercar prova..." oninput="doSearch(this.value)">
+  </div>
+  <div class="filters" id="filters">
+    <button class="filter-btn active" onclick="filterCat('tot',this)">Totes</button>
+    <button class="filter-btn" onclick="filterCat('cursa',this)">🏃 Curses</button>
+    <button class="filter-btn" onclick="filterCat('tanques',this)">🚧 Tanques</button>
+    <button class="filter-btn" onclick="filterCat('salt',this)">🦘 Salts</button>
+    <button class="filter-btn" onclick="filterCat('llancament',this)">🏋️ Llançaments</button>
+    <button class="filter-btn" onclick="filterCat('relleu',this)">🔄 Relleus</button>
+    <button class="filter-btn" onclick="filterCat('marxa',this)">🚶 Marxa</button>
+  </div>
+  <div class="ref-grid" id="refGrid"></div>
+</main>
+<script src="shared.js"></script>
+<script>
+const CATS_CAMP={"100m FEM. AL":"cursa","200m FEM. AL":"cursa","400m FEM. AL":"cursa","800m FEM. AL":"cursa","1.500m FEM. AL":"cursa","3.000m FEM. AL":"cursa","Vallas Altas VET. Fem. AL":"tanques","Vallas Bajas VET. Fem. AL":"tanques","2.000m Obst. FEM.":"tanques","Altura FEM. AL":"salt","Pértiga FEM. AL":"salt","Longitud FEM. AL":"salt","Triple Salto FEM. AL":"salt","Peso VET. Fem. AL":"llancament","Disco VET. Fem.":"llancament","Martillo Pesado VET. Fem. AL":"llancament","Martillo VET. Fem.":"llancament","Jabalina VET. Fem.":"llancament","4x100m FEM. AL":"relleu","4x400m FEM. AL":"relleu","3.000m Marcha FEM. en pista":"marxa"};
+const HIST={"100m FEM. AL":{p22:[98.61,93.01,89.87,87.80,82.14,78.31,85.76,79.30],p23:[84.83,87.08,78.91,80.42,81.31,81.79,64.97,65.26],p24:[86.60,82.17,82.44,null,null,null,null,null],pratenc:{23:{pos:2,nota:"Yvette Henry 13.33s → 2a! 🏆"}}},"200m FEM. AL":{p22:[88.49,92.38,83.87,83.62,94.36,88.60,84.63,null],p23:[84.25,84.97,78.14,78.95,78.59,74.82,69.30,null],p24:[81.56,null,80.51,78.99,79.07,84.66,null,null],pratenc:{23:{pos:3,nota:"Yvette Henry 28.03s → 3a! 🏆"}}},"400m FEM. AL":{p22:[87.85,98.73,89.47,84.01,80.76,82.58,84.46,null],p23:[94.75,89.10,81.60,80.57,79.53,83.43,72.81,69.76],p24:[89.34,81.42,78.52,71.73,75.08,null,74.48,null],pratenc:{23:{pos:7,nota:"Marta Alias 1:15.90 → 7a"}}},"800m FEM. AL":{p22:[87.64,91.74,84.59,84.18,89.14,82.37,72.28,78.32],p23:[83.23,83.65,76.59,75.50,77.65,78.59,73.99,66.35],p24:[88.83,78.62,74.84,null,null,null,null,null],pratenc:{23:{pos:5,nota:"Marta Alias 2:46.58 → 5a"}}},"1.500m FEM. AL":{p22:[97.33,79.23,87.84,98.11,95.72,86.62,76.91,63.01],p23:[78.24,89.16,80.98,75.90,72.66,74.44,78.17,58.60],p24:[87.24,71.69,89.02,78.42,75.88,null,77.44,null],pratenc:{23:{pos:6,nota:"Begoña del Salto 6:01.59 → 6a"}}},"3.000m FEM. AL":{p22:[96.38,92.08,85.47,76.98,83.77,68.16,78.01,85.69],p23:[83.52,73.75,84.67,77.44,78.09,68.74,70.74,61.65],p24:[null,80.88,78.94,73.42,75.31,77.47,64.32,null],pratenc:{23:{pos:6,nota:"Patricia Galdames 13:24.05 → 6a"},24:{pos:1,nota:"Noelia Jiménez (f) 11:16.08 → 1a! 🏆"}}},"Vallas Altas VET. Fem. AL":{p22:[72.39,null,null,null,null,null,null,null],p23:[null,null,null,null,null,null,null,null],p24:[68.03,null,null,null,null,null,null,null],pratenc:{}},"Vallas Bajas VET. Fem. AL":{p22:[91.06,90.70,88.65,83.28,63.16,null,null,null],p23:[84.76,81.13,82.96,74.22,50.63,65.31,null,null],p24:[86.46,76.64,77.14,null,null,73.25,null,null],pratenc:{23:{pos:4,nota:"Estela Roldán 15.32s → 4a"},24:{pos:1,nota:"Begoña Martínez 13.15s → 1a! 🏆"}}},"2.000m Obst. FEM.":{p22:[88.44,88.23,84.91,87.93,85.05,76.29,79.87,77.57],p23:[86.49,88.91,82.86,84.08,81.14,76.72,55.61,null],p24:[null,92.44,65.35,73.26,76.56,70.10,null,null],pratenc:{23:{pos:2,nota:"Noelia Jiménez 7:42.11 → 2a! 🏆"},24:{pos:1,nota:"Noelia Jiménez (f) 7:46.12 → 1a! 🏆"}}},"Altura FEM. AL":{p22:[81.67,86.29,85.29,70.10,90.67,80.75,88.57,null],p23:[80.86,80.91,80.11,83.58,73.42,72.37,77.03,62.86],p24:[80.58,78.99,null,77.15,82.55,67.23,null,null],pratenc:{23:{pos:4,nota:"Monica Vicente 1.35m → 4a"},24:{pos:3,nota:"Estela Roldán 1.35m → 3a (f)"}}},"Pértiga FEM. AL":{p22:[71.67,76.10,61.48,50.70,46.94,37.10,null,null],p23:[69.34,68.32,66.21,65.40,67.62,50.39,null,null],p24:[75.97,64.15,null,64.00,null,48.21,null,null],pratenc:{23:{pos:2,nota:"Patricia Hidalgo 3.25m → 2a! 🏆"},24:{pos:3,nota:"Patricia Hidalgo (f) 2.90m → 3a"}}},"Longitud FEM. AL":{p22:[71.81,75.12,88.98,73.69,66.61,67.55,72.39,67.77],p23:[77.21,76.28,76.45,84.09,82.02,67.75,62.40,52.06],p24:[71.31,null,72.03,73.86,63.44,65.78,48.20,null],pratenc:{23:{pos:2,nota:"Geraldine Garcia 4.85m → 2a! 🏆"},24:{pos:2,nota:"Geraldine Garcia (f) 4.42m → 2a"}}},"Triple Salto FEM. AL":{p22:[95.73,73.52,80.77,71.30,71.44,72.50,72.24,81.91],p23:[75.27,70.59,68.64,69.70,87.25,84.18,64.75,67.35],p24:[70.86,71.06,70.16,68.11,60.06,null,null,null],pratenc:{23:{pos:8,nota:"Gemma Cassí 8.67m → 8a"},24:{pos:6,nota:"Gemma Cassí (f) 8.39m → 6a"}}},"Peso VET. Fem. AL":{p22:[61.01,49.48,70.03,63.63,64.36,57.80,null,null],p23:[56.64,64.00,64.35,64.35,39.68,46.64,null,null],p24:[58.65,57.87,58.26,55.69,55.05,64.91,null,null],pratenc:{23:{pos:2,nota:"Estela Roldán 9.19m → 2a"},24:{pos:2,nota:"Carmen Solé (f) 9.83m → 2a"}}},"Disco VET. Fem.":{p22:[42.95,47.27,42.42,42.25,35.12,36.26,29.24,32.78],p23:[45.04,54.51,46.45,44.36,45.97,45.19,43.33,34.12],p24:[null,48.12,44.30,null,null,39.03,null,null],pratenc:{23:{pos:2,nota:"Gemma Cassí 30.06m → 2a! 🏆"},24:{pos:1,nota:"Gemma Cassí (f) 31.14m → 1a"}}},"Martillo Pesado VET. Fem. AL":{p22:[null,null,null,null,null,null,null,null],p23:[null,null,null,null,null,null,null,null],p24:[null,null,null,null,null,null,null,null],noCelebrated:true,pratenc:{}},"Martillo VET. Fem.":{p22:[75.23,39.10,29.32,26.57,null,null,null,null],p23:[60.42,33.03,30.26,null,41.34,49.13,null,null],p24:[null,57.26,55.30,47.21,null,null,null,null],pratenc:{23:{pos:3,nota:"Cristina Garcia 19.64m → 3a"},24:{pos:1,nota:"Carmen Solé (f) 41.66m → 1a"}}},"Jabalina VET. Fem.":{p22:[51.65,51.27,42.80,43.73,40.70,29.66,null,55.16],p23:[51.73,49.18,46.45,43.31,43.46,33.33,45.28,null],p24:[63.66,null,50.51,null,null,null,41.05,49.10],pratenc:{23:{pos:2,nota:"Cristina Garcia 28.45m → 2a"},24:{pos:2,nota:"Cristina Garcia (f) 30.55m → 2a"}}},"4x100m FEM. AL":{p22:[88.33,85.29,85.79,79.64,82.07,81.64,78.13,74.85],p23:[83.29,null,74.60,74.17,72.15,75.39,68.88,null],p24:[null,80.56,79.21,75.02,74.99,69.83,null,null],pratenc:{23:{pos:2,nota:"Monica, Geraldine, Patricia H., Begoña → 2a! 🏆"}}},"4x400m FEM. AL":{p22:[81.04,85.01,83.64,77.84,77.62,78.24,null,null],p23:[78.43,73.27,74.26,74.81,66.34,null,null,null],p24:[null,76.52,69.74,67.83,60.58,71.58,null,null],pratenc:{}},"3.000m Marcha FEM. en pista":{p22:[77.94,78.41,76.38,79.14,75.13,76.48,66.40,81.50],p23:[83.94,79.89,79.81,79.84,62.47,84.12,60.26,60.26],p24:[82.81,78.47,70.68,76.03,74.08,63.40,null,null],pratenc:{23:{pos:8,nota:"Patricia Galdames 22:04.15 → 8a"},24:{nota:"Patricia Galdames (f) 22:59.07 → 7a"}}}};
+const NOTES_INFO={"Vallas Bajas VET. Fem. AL":"80m tanques F40-49 (0.762m) i F50-59 (0.762m). Factor WMA compensa la diferència.","Vallas Altas VET. Fem. AL":"100m tanques F35 (0.838m) / 80m tanques F40+. Factor WMA ajusta per edat.","Martillo Pesado VET. Fem. AL":"⚠️ MAI celebrada als campionats 2022-2024. Sense dades.","Peso VET. Fem. AL":"F35-F45 usa 4kg · F50+ usa 3kg.","Jabalina VET. Fem.":"F40-F45 usa 600g · F55+ usa 500g.","Martillo VET. Fem.":"F50-F55 usa 3kg."};
+
+let curCat='tot', curSearch='';
+
+function pctCls(p){
+  if(p===null||p===undefined)return 'pct-empty';
+  if(p>=90)return 'pct-best';
+  if(p>=80)return 'pct-good';
+  if(p>=70)return 'pct-mid';
+  return 'pct-low';
+}
+function catTag(cat){
+  const m={cursa:'cursa',tanques:'tanques',salt:'salt',llancament:'llanc',relleu:'relleu',marxa:'marxa'};
+  const lbl={cursa:'cursa',tanques:'tanques',salt:'salt',llanc:'llanç.',relleu:'relleu',marxa:'marxa'};
+  const c=m[cat]||'cursa';
+  return `<span class="cat-tag cat-${c}">${lbl[c]||c}</span>`;
+}
+function filterCat(cat,btn){
+  curCat=cat;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function doSearch(txt){curSearch=txt.toLowerCase();render();}
+
+function render(){
+  const grid=document.getElementById('refGrid');
+  const entries=Object.entries(HIST).filter(([prova])=>{
+    const cat=CATS_CAMP[prova]||'cursa';
+    return (curCat==='tot'||cat===curCat)&&(!curSearch||prova.toLowerCase().includes(curSearch));
+  });
+  if(!entries.length){grid.innerHTML='<p style="color:#6b7f93;grid-column:1/-1;">Cap prova trobada</p>';return;}
+
+  grid.innerHTML=entries.map(([prova,data])=>{
+    const cat=CATS_CAMP[prova]||'cursa';
+    const {p22,p23,p24,pratenc,noCelebrated}=data;
+    const note=NOTES_INFO[prova]||'';
+    const pratencNotes=[22,23,24].filter(y=>pratenc[y]).map(y=>`<div class="note pratenc">◆ ${y+2000}: ${pratenc[y].nota||''}</div>`).join('');
+
+    let numRows=8;
+    for(let i=7;i>=0;i--){if(p22[i]!==null||p23[i]!==null||p24[i]!==null){numRows=i+1;break;}}
+    if(numRows<1)numRows=1;
+
+    const refArr=REF_CAMPEONATS_DEFAULT[Object.entries(CAMP_PROVA_MAP).find(([k])=>k===prova)?.[1]||prova]||[];
+
+    const mkCell=(val,isPrat)=>{
+      if(val===null||val===undefined)return`<td><span class="pct-cell pct-empty">—</span></td>`;
+      const border=isPrat?'outline:2px solid #1a7a3a;outline-offset:-2px;':'';
+      return`<td><span class="pct-cell ${pctCls(val)}" style="${border}" title="${isPrat?'◆ Pratenc':''}">${isPrat?'◆ ':''}${val.toFixed(1)}%</span></td>`;
+    };
+
+    let bodyHtml;
+    if(noCelebrated){
+      bodyHtml=`<div class="no-celebration">⚠️ Prova mai celebrada — sense dades disponibles.</div>`;
+    } else {
+      const thead=`<thead><tr>
+        <th style="text-align:left">Pos</th><th>Pts</th>
+        <th>2022</th><th>2023</th><th>2024</th>
+        <th title="Llindar simulador">% Sim.</th>
+      </tr></thead>`;
+      const pts_map=[8,7,6,5,4,3,2,1];
+      const tbody=Array.from({length:numRows},(_,i)=>{
+        const pos=i+1,pts=pts_map[i]||1;
+        const [v22,v23,v24]=[p22[i],p23[i],p24[i]];
+        const simVal=refArr[i]!==undefined&&refArr[i]!==null?refArr[i]:null;
+        const isPr22=pratenc[22]?.pos===pos,isPr23=pratenc[23]?.pos===pos,isPr24=pratenc[24]?.pos===pos;
+        const anyPr=isPr22||isPr23||isPr24;
+        const posCls=pos<=3?`p${pos}`:'pN';
+        return`<tr class="${anyPr?'pratenc-row':''}">
+          <td><span class="pos-badge ${posCls}">${pos}a</span></td>
+          <td class="pts-col">${pts}</td>
+          ${mkCell(v22,isPr22)}${mkCell(v23,isPr23)}${mkCell(v24,isPr24)}
+          <td><span class="pct-cell ${pctCls(simVal)}">${simVal!==null?simVal+'%':'—'}</span></td>
+        </tr>`;
+      }).join('');
+      bodyHtml=`<table class="ref-table">${thead}<tbody>${tbody}</tbody></table>`;
+    }
+    return`<div class="ref-card">
+      <div class="ref-card-header"><h3>${prova} ${catTag(cat)}</h3>
+        ${note?`<div class="note">ℹ ${note}</div>`:''}${pratencNotes}
+      </div>${bodyHtml}
+    </div>`;
+  }).join('');
+}
+render();
+</script>
+</body>
+</html>

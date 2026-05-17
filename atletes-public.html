@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pratenc AA — Atletes</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── Targetes atletes ── */
+.athlete-card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:0.7rem;overflow:hidden;border:1px solid #e2e8f0;}
+.athlete-head{display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;user-select:none;}
+.athlete-head:hover{background:#f8fafc;}
+.av{width:38px;height:38px;border-radius:50%;background:#2563a8;color:#fff;font-weight:700;font-size:0.82rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.av.filial{background:#d97706;}
+.athlete-info{flex:1;min-width:0;}
+.athlete-nom{font-weight:600;font-size:0.88rem;color:#1a3a5c;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.athlete-sub{font-size:0.72rem;color:#6b7f93;margin-top:1px;}
+.cat-badge{font-size:0.65rem;font-weight:700;background:#e0eaff;color:#2563a8;border-radius:4px;padding:1px 6px;}
+.fil-badge{font-size:0.62rem;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;border-radius:4px;padding:1px 6px;}
+.chevron{width:16px;height:16px;stroke:#94a3b8;transition:transform 0.2s;flex-shrink:0;}
+.chevron.open{transform:rotate(180deg);}
+/* ── Marques ── */
+.marks-body{display:none;padding:0 1rem 0.75rem;border-top:1px solid #f1f5f9;}
+.marks-body.open{display:block;}
+.marks-grid{display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;align-items:center;margin-top:0.5rem;}
+.marks-header{font-size:0.65rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;padding-bottom:4px;border-bottom:1px solid #f1f5f9;}
+.mark-row{display:contents;}
+.mark-row span{font-size:0.78rem;padding:3px 0;border-bottom:1px solid #f8fafc;color:#374151;}
+.mark-prova{font-weight:500;color:#1a3a5c;}
+.mark-marca{font-family:'Courier New',monospace;font-size:0.75rem;color:#374151;}
+.pct-pill{display:inline-block;padding:2px 7px;border-radius:10px;font-size:0.7rem;font-weight:700;}
+.pct-gold{background:#fef9c3;color:#854d0e;}
+.pct-silver{background:#f1f5f9;color:#334155;}
+.pct-bronze{background:#fef3c7;color:#92400e;}
+.pct-ok{background:#f0fdf4;color:#166534;}
+.pct-low{background:#fafafa;color:#9ca3af;}
+.no-marks{font-size:0.75rem;color:#94a3b8;padding:0.5rem 0;font-style:italic;}
+/* ── Stats bar ── */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:1rem;}
+.stat{background:#fff;border-radius:8px;padding:0.5rem;text-align:center;border:1px solid #e2e8f0;}
+.stat .val{font-size:1.2rem;font-weight:700;color:#2563a8;}
+.stat .lbl{font-size:0.62rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;}
+/* ── Filials secció ── */
+.section-title{font-size:0.72rem;font-weight:700;color:#6b7f93;text-transform:uppercase;letter-spacing:0.06em;margin:1rem 0 0.4rem;padding-left:2px;}
+/* ── Mobile ── */
+@media(max-width:500px){
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .marks-grid{grid-template-columns:1fr auto auto;gap:2px 6px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-logo">PA</div>
+  <div class="header-text">
+    <h1>Pratenc Associació d'Atletisme</h1>
+    <div class="sub">Atletes femenines · Master · WMA 2023</div>
+  </div>
+  <div class="header-right">v3.0</div>
+</header>
+<nav>
+  <a href="atletes-public.html" class="active">👟 Atletes</a>
+  <a href="campeonatos-public.html">📊 Campionats</a>
+  <a href="simulador-public.html">🏃 Simulador</a>
+</nav>
+<main>
+  <div class="stats-bar">
+    <div class="stat"><div class="val" id="sAt">—</div><div class="lbl">Atletes</div></div>
+    <div class="stat"><div class="val" id="sM">—</div><div class="lbl">Marques</div></div>
+    <div class="stat"><div class="val" id="sP">—</div><div class="lbl">Proves</div></div>
+    <div class="stat"><div class="val" id="sC">—</div><div class="lbl">Categories</div></div>
+  </div>
+  <div id="list"></div>
+</main>
+
+<script src="atletes-data.js"></script>
+<script src="shared.js"></script>
+<script>
+// Override de storage per si shared.js l'intenta cridar
+async function loadAthletes(){return [];}
+async function saveAthletes(){}
+
+const athletes = JSON.parse(JSON.stringify(ATLETES_DATA));
+athletes.sort((a,b)=>{
+  if(!!a.filial!==!!b.filial)return a.filial?1:-1;
+  return a.nom.localeCompare(b.nom,'ca');
+});
+
+function initials(nom){
+  return nom.split(' ').slice(0,2).map(p=>p[0]).join('');
+}
+
+function pctClass(pct){
+  if(pct===null||pct===undefined)return 'pct-low';
+  if(pct>=90)return 'pct-gold';
+  if(pct>=80)return 'pct-silver';
+  if(pct>=70)return 'pct-bronze';
+  if(pct>=55)return 'pct-ok';
+  return 'pct-low';
+}
+
+function renderMarques(a){
+  const marques = (a.marques||[]).filter(m=>m.prova&&m.prova!=='—'&&m.marca);
+  if(!marques.length) return `<div class="no-marks">Sense marques registrades</div>`;
+  return `
+    <div class="marks-grid">
+      <span class="marks-header">Prova</span>
+      <span class="marks-header" style="text-align:right;">Marca</span>
+      <span class="marks-header" style="text-align:right;">% WMA</span>
+      ${marques.map(m=>{
+        const pct = calcPct(m.prova, m.marca, a.dob, m.any);
+        const cls = pctClass(pct);
+        return `
+          <span class="mark-row mark-prova">${m.prova}</span>
+          <span class="mark-row mark-marca" style="text-align:right;">${m.marca} <span style="font-size:0.62rem;color:#94a3b8;">${m.any}</span></span>
+          <span class="mark-row" style="text-align:right;">
+            ${pct!==null?`<span class="pct-pill ${cls}">${pct.toFixed(1)}%</span>`:'<span style="color:#d1d5db;font-size:0.72rem;">—</span>'}
+          </span>`;
+      }).join('')}
+    </div>`;
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const federades = athletes.filter(a=>!a.filial);
+  const filials   = athletes.filter(a=>a.filial);
+
+  function renderGroup(grup){
+    return grup.map((a,i)=>{
+      const idx = athletes.indexOf(a);
+      const cat = getCat(a.dob);
+      const ed  = getEdatActual(a.dob);
+      return `
+        <div class="athlete-card">
+          <div class="athlete-head" onclick="tog(${idx})">
+            <div class="av ${a.filial?'filial':''}">${initials(a.nom)}</div>
+            <div class="athlete-info">
+              <div class="athlete-nom">
+                ${a.nom}
+                ${cat?`<span class="cat-badge">${cat}</span>`:''}
+                ${a.filial?`<span class="fil-badge">FILIAL</span>`:''}
+              </div>
+              <div class="athlete-sub">${ed?ed+'a · ':''}${a.notes||''} · ${(a.marques||[]).length} marques</div>
+            </div>
+            <svg class="chevron" id="chev${idx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="marks-body" id="body${idx}">
+            ${renderMarques(a)}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  list.innerHTML =
+    (federades.length ? renderGroup(federades) : '') +
+    (filials.length ? `<div class="section-title">Atletes filials (${filials.length}/4)</div>${renderGroup(filials)}` : '');
+
+  // Stats
+  document.getElementById('sAt').textContent = athletes.length;
+  document.getElementById('sM').textContent  = athletes.reduce((s,a)=>s+(a.marques||[]).length,0);
+  const ps = new Set(athletes.flatMap(a=>(a.marques||[]).map(m=>m.prova).filter(p=>p&&p!=='—')));
+  document.getElementById('sP').textContent  = ps.size;
+  const cats = [...new Set(athletes.map(a=>getCat(a.dob)).filter(Boolean))].sort();
+  document.getElementById('sC').textContent  = cats.join(', ')||'—';
+}
+
+function tog(idx){
+  document.getElementById(`body${idx}`).classList.toggle('open');
+  document.getElementById(`chev${idx}`).classList.toggle('open');
+}
+
+render();
+</script>
+</body>
+</html>
