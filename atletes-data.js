@@ -426,5 +426,4 @@ const ATLETES_DATA = [
     ],
     "filial": true
   }
-]
 ];
