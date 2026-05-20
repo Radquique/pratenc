@@ -80,6 +80,9 @@
 async function loadAthletes(){return [];}
 async function saveAthletes(){}
 
+// Atletes lesionades — excloses per defecte
+const LESIONADES = ['GERALDINE GARCIA COLLINS', 'GEMMA CASSI PADROS'];
+
 const athletes = JSON.parse(JSON.stringify(ATLETES_DATA));
 athletes.sort((a,b)=>{
   if(!!a.filial!==!!b.filial)return a.filial?1:-1;
@@ -131,7 +134,7 @@ function render(){
       const cat = getCat(a.dob);
       const ed  = getEdatActual(a.dob);
       return `
-        <div class="athlete-card">
+        <div class="athlete-card" style="${LESIONADES.includes(a.nom)?'opacity:0.5;':''}">
           <div class="athlete-head" onclick="tog(${idx})">
             <div class="av ${a.filial?'filial':''}">${initials(a.nom)}</div>
             <div class="athlete-info">
@@ -139,6 +142,7 @@ function render(){
                 ${a.nom}
                 ${cat?`<span class="cat-badge">${cat}</span>`:''}
                 ${a.filial?`<span class="fil-badge">FILIAL</span>`:''}
+                ${LESIONADES.includes(a.nom)?`<span style="font-size:0.62rem;font-weight:700;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:1px 6px;">🩹 LESIONADA</span>`:''}
               </div>
               <div class="athlete-sub">${ed?ed+'a · ':''}${a.notes||''} · ${(a.marques||[]).length} marques</div>
             </div>
