@@ -132,7 +132,7 @@ function render(){
       const cat = getCat(a.dob);
       const ed  = getEdatActual(a.dob);
       return `
-        <div class="athlete-card${a.exclosa?' exclosa':''}">
+        <div class="athlete-card">
           <div class="athlete-head" onclick="tog(${idx})">
             <div class="av ${a.filial?'filial':''}">${initials(a.nom)}</div>
             <div class="athlete-info">
@@ -140,7 +140,6 @@ function render(){
                 ${a.nom}
                 ${cat?`<span class="cat-badge">${cat}</span>`:''}
                 ${a.filial?`<span class="fil-badge">FILIAL</span>`:''}
-                ${a.exclosa?`<span class="excl-badge">🩹 LESIONADA</span>`:''}
               </div>
               <div class="athlete-sub">${ed?ed+'a · ':''}${a.notes||''} · ${(a.marques||[]).length} marques</div>
             </div>
