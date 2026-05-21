@@ -936,42 +936,32 @@ async function runOptimizer(){
   const act = athletes.filter(a=>!excluded.includes(a.nom));
   const ns={};
   act.forEach(a=>{ns[a.nom]=[{prova:'—',pct:null,man:false},{prova:'—',pct:null,man:false}];});
-  const nRel={};
-  CAMP_PROVES_REL.forEach(rel=>{nRel[rel]=[];});
-
   const nPA={}; act.forEach(a=>{nPA[a.nom]=0;});
   let tf=0;
-  const cob={};
+  const cob={}; // prova individual → nom atleta
 
-  // Funció per calcular el millor % per a una prova donada la categoria/notes de l'atleta
-  function bestGuess(a, prova){
-    const row = (a.marques||[]).find(m=>m.prova===prova);
-    if(row){const p=calcPct(prova,row.marca,a.dob,row.any);if(p!==null)return p;}
-    return null;
-  }
-
-  // Mapa de proves recomanades per especialitat (notes)
+  // Mapa especialitat → proves recomanades (per atletes sense marca)
   const ESP_MAP={
     'VELOCISTA':['100m','200m'],
-    'MIG FONS':['400m','800m','1500m'],
-    'FONS':['1500m','3000m','800m','2000m obstacles'],
-    'COMBINADES':['Salt alçada','Salt llargada','Triple salt','100m','200m','400m','Tanques Altes'],
-    'LLANÇAMENTS':['Llançament disc','Llançament martell','Llançament pes','Llançament javelina'],
-    'SALT':['Salt alçada','Salt llargada','Triple salt','Salt perxa'],
+    'MIG FONS':['400m','800m'],
+    'FONS':['1500m','3000m','800m'],
+    'COMBINADES':['Salt alçada','Salt llargada','100m','400m'],
+    'LLANÇAMENTS':['Llançament disc','Llançament martell','Llançament pes'],
+    'SALT':['Salt alçada','Salt llargada','Triple salt'],
     'PERXA':['Salt perxa','100m'],
     'MARXA':['3000m marxa'],
   };
 
-  // Construïm opcions de cada atleta: marques reals primer, després especialitat
-  function getOps(a){
+  // Opcions d'una atleta: marques reals ordenades per pts, després especialitat amb 1pt
+  function getOpsInd(a){
     const ops=[];
-    // Marques reals
     (a.marques||[]).forEach(m=>{
       if(!m.prova||m.prova==='—'||isReleu(m.prova))return;
       const pct=calcPct(m.prova,m.marca,a.dob,m.any);
       if(pct!==null) ops.push({prova:m.prova,pct,pts:estPts(m.prova,pct,refCampeonats),real:true});
     });
-    // Especialitat (si no té marca real en aquelles proves)
+    ops.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
+    // Afegir proves d'especialitat sense marca (1pt) si no en té
     const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
     if(esp){
       ESP_MAP[esp].forEach(p=>{
@@ -979,33 +969,14 @@ async function runOptimizer(){
           ops.push({prova:p,pct:0,pts:1,real:false});
       });
     }
-    ops.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
     return ops;
   }
 
-  // ── FASE 1: Relleu 4x100 — omplir amb les 4 velocistes/combinades amb millor 100m ──
-  const rel100='Relleu 4x100';
-  const cands100=act
-    .map(a=>{
-      const pct=bestGuess(a,'100m');
-      return {a,pct:pct||0};
-    })
-    .sort((a,b)=>b.pct-a.pct)
-    .slice(0,4);
-
-  cands100.forEach(({a})=>{
-    nRel[rel100].push(a.nom);
-    // Assignar com a prova al slot lliure
-    const slot=nPA[a.nom];
-    ns[a.nom][slot]={prova:rel100,pct:null,man:false};
-    nPA[a.nom]++;
-    if(a.filial)tf++;
-  });
-
-  // ── FASE 2: Proves individuals — greedy per puntuació ──
+  // ── FASE 1: Assignar proves individuals greedy per pts (màx 2 per atleta) ──
+  // Construïm totes les opcions i ordenem per pts DESC
   const allOps=[];
   act.forEach(a=>{
-    getOps(a).forEach(op=>{
+    getOpsInd(a).forEach(op=>{
       allOps.push({nom:a.nom,fil:!!a.filial,...op});
     });
   });
@@ -1013,11 +984,9 @@ async function runOptimizer(){
 
   for(const op of allOps){
     const{nom,fil,prova}=op;
-    if(isReleu(prova))continue;
-    if(cob[prova])continue;           // ja coberta per una altra atleta
-    if(nPA[nom]>=2)continue;          // ja té 2 proves
-    if(fil&&tf>=4)continue;           // límit filials
-
+    if(cob[prova]) continue;       // prova ja coberta per altra atleta
+    if(nPA[nom]>=2) continue;      // atleta ja té 2 proves
+    if(fil&&tf>=4) continue;       // límit filials
     const slot=nPA[nom];
     ns[nom][slot]={prova,pct:null,man:false};
     cob[prova]=nom;
@@ -1025,33 +994,114 @@ async function runOptimizer(){
     if(fil)tf++;
   }
 
-  // ── FASE 3: Atletes amb 0 proves però amb marques — assignar-ne 1 ──
-  act.forEach(a=>{
-    if(nPA[a.nom]>0)return;
-    if(a.filial&&tf>=4)return;
-    const ops=getOps(a).filter(o=>o.real&&!isReleu(o.prova)&&!cob[o.prova]);
-    if(ops.length){
-      const best=ops[0];
-      ns[a.nom][0]={prova:best.prova,pct:null,man:false};
-      cob[best.prova]=a.nom;
+  // ── FASE 2: Atletes amb 1 prova → intentar afegir-ne una 2a ──
+  // (ja cobert pel greedy anterior si hi ha opcions disponibles)
+
+  // ── FASE 3: Relleu 4x100 — OBLIGATORI per al 75% ──
+  // Escollir les 4 atletes que menys puntuen en les seves proves individuals
+  // (o que no tenen cap prova assignada), respectant límit filials
+  const rel100='Relleu 4x100';
+  const newRel100=[];
+
+  // Ordenem per: primer les que tenen 0 proves, després les que puntuen menys
+  // i que encara poden afegir una prova (nPA < 2)
+  const cands100=act
+    .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
+    .map(a=>{
+      // Punts totals actuals de l'atleta en proves individuals
+      const ptsActuals=ns[a.nom]
+        .filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova))
+        .reduce((s,r)=>{
+          const pct=bestPct(a,r.prova,r);
+          return s+estPts(r.prova,pct,refCampeonats);
+        },0);
+      return{a,ptsActuals,nProv:nPA[a.nom]};
+    })
+    // Prioritat: menys proves primer, dins del mateix nProv menys punts primer
+    .sort((x,y)=>x.nProv-y.nProv||x.ptsActuals-y.ptsActuals)
+    .slice(0,4);
+
+  if(cands100.length>=4){
+    cands100.forEach(({a})=>{
+      newRel100.push(a.nom);
+      const slot=nPA[a.nom];
+      ns[a.nom][slot]={prova:rel100,pct:null,man:false};
       nPA[a.nom]++;
       if(a.filial)tf++;
-    }
-  });
+    });
+  } else {
+    // Si no hi ha 4 candidates lliures, agafem les que puntuen menys globalment
+    act
+      .filter(a=>!(a.filial&&tf>=4))
+      .map(a=>{
+        const ptsActuals=ns[a.nom]
+          .filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova))
+          .reduce((s,r)=>{
+            const pct=bestPct(a,r.prova,r);
+            return s+estPts(r.prova,pct,refCampeonats);
+          },0);
+        return{a,ptsActuals};
+      })
+      .sort((x,y)=>x.ptsActuals-y.ptsActuals)
+      .slice(0,4)
+      .forEach(({a})=>{
+        // Si ja té 2 proves, substituïm la que puntua menys per el relleu
+        if(nPA[a.nom]>=2){
+          const minSlot=ns[a.nom]
+            .map((r,i)=>({r,i,pts:estPts(r.prova,bestPct(a,r.prova,r),refCampeonats)}))
+            .filter(x=>!isReleu(x.r.prova)&&x.r.prova!=='—')
+            .sort((a,b)=>a.pts-b.pts)[0];
+          if(minSlot&&minSlot.pts<=4){
+            delete cob[minSlot.r.prova];
+            ns[a.nom][minSlot.i]={prova:rel100,pct:null,man:false};
+          }
+        } else {
+          const slot=nPA[a.nom];
+          ns[a.nom][slot]={prova:rel100,pct:null,man:false};
+          nPA[a.nom]++;
+          if(a.filial)tf++;
+        }
+        newRel100.push(a.nom);
+      });
+  }
 
-  // ── FASE 4: Relleu 4x400 — si queden atletes amb <2 proves ──
+  // ── FASE 4: Proves sueltes > Relleu 4x400 ──
+  // Intentem omplir proves individuals buides amb atletes que encara no en tenen 2
+  const actSeg=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
+  const allOps2=[];
+  actSeg.forEach(a=>{
+    getOpsInd(a).forEach(op=>{
+      if(!cob[op.prova]) allOps2.push({nom:a.nom,fil:!!a.filial,...op});
+    });
+  });
+  allOps2.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
+  for(const op of allOps2){
+    const{nom,fil,prova}=op;
+    if(cob[prova])continue;
+    if(nPA[nom]>=2)continue;
+    if(fil&&tf>=4)continue;
+    ns[nom][nPA[nom]]={prova,pct:null,man:false};
+    cob[prova]=nom;
+    nPA[nom]++;
+    if(fil)tf++;
+  }
+
+  // ── FASE 5: Relleu 4x400 — NOMÉS si hi ha 4 atletes amb slot lliure ──
   const rel400='Relleu 4x400';
-  const lliures400=act
-    .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
-    .map(a=>{const pct=bestGuess(a,'400m');return{a,pct:pct||0};})
+  const newRel400=[];
+  const cands400=act
+    .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4)&&!newRel100.includes(a.nom))
+    .map(a=>{
+      const pct=calcPct('400m',(a.marques||[]).find(m=>m.prova==='400m')?.marca||'',a.dob,new Date().getFullYear());
+      return{a,pct:pct||0};
+    })
     .sort((a,b)=>b.pct-a.pct)
     .slice(0,4);
 
-  if(lliures400.length>=4){
-    lliures400.forEach(({a})=>{
-      nRel[rel400].push(a.nom);
-      const slot=nPA[a.nom];
-      ns[a.nom][slot]={prova:rel400,pct:null,man:false};
+  if(cands400.length>=4){
+    cands400.forEach(({a})=>{
+      newRel400.push(a.nom);
+      ns[a.nom][nPA[a.nom]]={prova:rel400,pct:null,man:false};
       nPA[a.nom]++;
       if(a.filial)tf++;
     });
@@ -1059,9 +1109,8 @@ async function runOptimizer(){
 
   // Actualitzar simRelState
   simRelState={};
-  CAMP_PROVES_REL.forEach(rel=>{
-    simRelState[rel]=nRel[rel].concat([null,null,null,null]).slice(0,4);
-  });
+  simRelState[rel100]=newRel100.concat([null,null,null,null]).slice(0,4);
+  simRelState[rel400]=newRel400.concat([null,null,null,null]).slice(0,4);
 
   simState=ns;
   await saveSimState(simState);
