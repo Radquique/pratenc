@@ -1087,35 +1087,32 @@ async function runOptimizer(){
     if(fil)tf++;
   }
 
-  // ── FASE 4b: Proves encara buides — buscar qualsevol atleta amb marca o especialitat ──
-  // (per cobrir proves com Martell Pesat, 3000m marxa, etc.)
+  // ── FASE 4b: Proves encara buides — cobrir amb qualsevol atleta amb slot lliure ──
+  // Prioritat: 1) té marca, 2) té especialitat compatible, 3) qualsevol (1pt)
   const provesInd = CAMP_PROVES_IND || PROVES.filter(p=>p!=='—'&&!isReleu(p));
   provesInd.forEach(prova=>{
-    if(cob[prova]) return; // ja coberta
-    // Buscar atleta que tingui marca en aquesta prova i tingui slot lliure
-    const cand = act
-      .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
-      .map(a=>{
-        const m=(a.marques||[]).find(mm=>mm.prova===prova);
-        if(m){
-          const pct=calcPct(prova,m.marca,a.dob,m.any);
-          return{a,pts:pct!==null?estPts(prova,pct,refCampeonats):1,pct:pct||0,real:true};
-        }
-        // Sense marca però especialitat compatible → 1pt
-        const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
-        if(esp&&ESP_MAP[esp].includes(prova))
-          return{a,pts:1,pct:0,real:false};
-        return null;
-      })
-      .filter(Boolean)
-      .sort((a,b)=>b.pts-a.pts||b.pct-a.pct)[0];
+    if(cob[prova]) return;
+    const lliures = act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
+    if(!lliures.length) return;
 
-    if(cand){
-      cob[prova]=cand.a.nom;
-      ns[cand.a.nom][nPA[cand.a.nom]]={prova,pct:null,man:false};
-      nPA[cand.a.nom]++;
-      if(cand.a.filial)tf++;
-    }
+    const scored = lliures.map(a=>{
+      const m=(a.marques||[]).find(mm=>mm.prova===prova);
+      if(m){
+        const pct=calcPct(prova,m.marca,a.dob,m.any);
+        return{a,pts:pct!==null?estPts(prova,pct,refCampeonats):1,pct:pct||0,pri:0};
+      }
+      const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
+      if(esp&&ESP_MAP[esp].includes(prova))
+        return{a,pts:1,pct:0,pri:1};
+      // Qualsevol atleta amb slot lliure → 1pt (últim recurs)
+      return{a,pts:1,pct:0,pri:2};
+    }).sort((a,b)=>a.pri-b.pri||b.pts-a.pts||b.pct-a.pct);
+
+    const cand=scored[0];
+    cob[prova]=cand.a.nom;
+    ns[cand.a.nom][nPA[cand.a.nom]]={prova,pct:null,man:false};
+    nPA[cand.a.nom]++;
+    if(cand.a.filial)tf++;
   });
 
   // ── FASE 5: Relleu 4x400 — NOMÉS si hi ha 4 atletes amb slot lliure ──
