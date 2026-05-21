@@ -942,12 +942,12 @@ async function runOptimizer(){
 
   // Mapa especialitat → proves recomanades (per atletes sense marca)
   const ESP_MAP={
-    'VELOCISTA':['100m','200m'],
-    'MIG FONS':['400m','800m'],
-    'FONS':['1500m','3000m','800m'],
-    'COMBINADES':['Salt alçada','Salt llargada','100m','400m'],
-    'LLANÇAMENTS':['Llançament disc','Llançament martell','Llançament pes'],
-    'SALT':['Salt alçada','Salt llargada','Triple salt'],
+    'VELOCISTA':['100m','200m','Tanques Altes'],
+    'MIG FONS':['400m','800m','Tanques Baixes'],
+    'FONS':['1500m','3000m','800m','2000m obstacles'],
+    'COMBINADES':['Salt alçada','Salt llargada','Triple salt','Tanques Altes','100m','400m','Llançament pes','Llançament javelina'],
+    'LLANÇAMENTS':['Llançament disc','Llançament martell','Martell Pesat','Llançament pes','Llançament javelina'],
+    'SALT':['Salt alçada','Salt llargada','Triple salt','Salt perxa'],
     'PERXA':['Salt perxa','100m'],
     'MARXA':['3000m marxa'],
   };
@@ -958,7 +958,9 @@ async function runOptimizer(){
     (a.marques||[]).forEach(m=>{
       if(!m.prova||m.prova==='—'||isReleu(m.prova))return;
       const pct=calcPct(m.prova,m.marca,a.dob,m.any);
-      if(pct!==null) ops.push({prova:m.prova,pct,pts:estPts(m.prova,pct,refCampeonats),real:true});
+      // Sempre afegim si té marca, fins i tot si pct és null (1pt garantit)
+      const ptsFinals = pct!==null ? estPts(m.prova,pct,refCampeonats) : 1;
+      ops.push({prova:m.prova,pct:pct||0,pts:ptsFinals,real:true});
     });
     ops.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
     // Afegir proves d'especialitat sense marca (1pt) si no en té
@@ -1065,8 +1067,7 @@ async function runOptimizer(){
       });
   }
 
-  // ── FASE 4: Proves sueltes > Relleu 4x400 ──
-  // Intentem omplir proves individuals buides amb atletes que encara no en tenen 2
+  // ── FASE 4: Proves sueltes — omplir proves buides amb atletes amb slot lliure ──
   const actSeg=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
   const allOps2=[];
   actSeg.forEach(a=>{
@@ -1085,6 +1086,37 @@ async function runOptimizer(){
     nPA[nom]++;
     if(fil)tf++;
   }
+
+  // ── FASE 4b: Proves encara buides — buscar qualsevol atleta amb marca o especialitat ──
+  // (per cobrir proves com Martell Pesat, 3000m marxa, etc.)
+  const provesInd = CAMP_PROVES_IND || PROVES.filter(p=>p!=='—'&&!isReleu(p));
+  provesInd.forEach(prova=>{
+    if(cob[prova]) return; // ja coberta
+    // Buscar atleta que tingui marca en aquesta prova i tingui slot lliure
+    const cand = act
+      .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
+      .map(a=>{
+        const m=(a.marques||[]).find(mm=>mm.prova===prova);
+        if(m){
+          const pct=calcPct(prova,m.marca,a.dob,m.any);
+          return{a,pts:pct!==null?estPts(prova,pct,refCampeonats):1,pct:pct||0,real:true};
+        }
+        // Sense marca però especialitat compatible → 1pt
+        const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
+        if(esp&&ESP_MAP[esp].includes(prova))
+          return{a,pts:1,pct:0,real:false};
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a,b)=>b.pts-a.pts||b.pct-a.pct)[0];
+
+    if(cand){
+      cob[prova]=cand.a.nom;
+      ns[cand.a.nom][nPA[cand.a.nom]]={prova,pct:null,man:false};
+      nPA[cand.a.nom]++;
+      if(cand.a.filial)tf++;
+    }
+  });
 
   // ── FASE 5: Relleu 4x400 — NOMÉS si hi ha 4 atletes amb slot lliure ──
   const rel400='Relleu 4x400';
