@@ -208,7 +208,8 @@ const ATLETES_DATA = [
         "marca": "1:20.48",
         "any": 2024
       }
-    ]
+    ],
+    "exclosa": true
   },
   {
     "nom": "ANDREA GALDAMES SESSAREGO",
@@ -365,7 +366,8 @@ const ATLETES_DATA = [
         "marca": "32.62",
         "any": 2024
       }
-    ]
+    ],
+    "exclosa": true
   },
   {
     "nom": "PATRICIA HIDALGO FORTES",
@@ -426,4 +428,5 @@ const ATLETES_DATA = [
     ],
     "filial": true
   }
-];
+]
+;
