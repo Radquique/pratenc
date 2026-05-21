@@ -34,7 +34,8 @@
 .pct-bronze{background:#fef3c7;color:#92400e;}
 .pct-ok{background:#f0fdf4;color:#166534;}
 .pct-low{background:#fafafa;color:#9ca3af;}
-.no-marks{font-size:0.75rem;color:#94a3b8;padding:0.5rem 0;font-style:italic;}
+.athlete-card.exclosa{opacity:0.5;border-style:dashed;}
+.excl-badge{font-size:0.62rem;font-weight:700;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:1px 6px;}
 /* ── Stats bar ── */
 .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:1rem;}
 .stat{background:#fff;border-radius:8px;padding:0.5rem;text-align:center;border:1px solid #e2e8f0;}
@@ -79,9 +80,6 @@
 // Override de storage per si shared.js l'intenta cridar
 async function loadAthletes(){return [];}
 async function saveAthletes(){}
-
-// Atletes lesionades — excloses per defecte
-const LESIONADES = ['GERALDINE GARCIA COLLINS', 'GEMMA CASSI PADROS'];
 
 const athletes = JSON.parse(JSON.stringify(ATLETES_DATA));
 athletes.sort((a,b)=>{
@@ -134,7 +132,7 @@ function render(){
       const cat = getCat(a.dob);
       const ed  = getEdatActual(a.dob);
       return `
-        <div class="athlete-card" style="${LESIONADES.includes(a.nom)?'opacity:0.5;':''}">
+        <div class="athlete-card${a.exclosa?' exclosa':''}">
           <div class="athlete-head" onclick="tog(${idx})">
             <div class="av ${a.filial?'filial':''}">${initials(a.nom)}</div>
             <div class="athlete-info">
@@ -142,7 +140,7 @@ function render(){
                 ${a.nom}
                 ${cat?`<span class="cat-badge">${cat}</span>`:''}
                 ${a.filial?`<span class="fil-badge">FILIAL</span>`:''}
-                ${LESIONADES.includes(a.nom)?`<span style="font-size:0.62rem;font-weight:700;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:1px 6px;">🩹 LESIONADA</span>`:''}
+                ${a.exclosa?`<span class="excl-badge">🩹 LESIONADA</span>`:''}
               </div>
               <div class="athlete-sub">${ed?ed+'a · ':''}${a.notes||''} · ${(a.marques||[]).length} marques</div>
             </div>
