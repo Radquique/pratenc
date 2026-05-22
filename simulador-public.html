@@ -931,7 +931,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
 // ── Optimitzador ──────────────────────────────────────────
 async function runOptimizer(){
   if(!athletes.length){showToast('No hi ha atletes');return;}
-  showToast('⏳ Calculant...');await new Promise(r=>setTimeout(r,60));
+  showToast('⏳ Calculant assignació òptima...');await new Promise(r=>setTimeout(r,60));
 
   const act = athletes.filter(a=>!excluded.includes(a.nom));
   const ns={};
@@ -952,18 +952,20 @@ async function runOptimizer(){
     'MARXA':['3000m marxa'],
   };
 
-  // Opcions d'una atleta: marques reals ordenades per pts, després especialitat amb 1pt
+  // ── Opcions individuals d'una atleta ordenades per pts DESC ──
   function getOpsInd(a){
     const ops=[];
     (a.marques||[]).forEach(m=>{
       if(!m.prova||m.prova==='—'||isReleu(m.prova))return;
       const pct=calcPct(m.prova,m.marca,a.dob,m.any);
-      // Sempre afegim si té marca, fins i tot si pct és null (1pt garantit)
       const ptsFinals = pct!==null ? estPts(m.prova,pct,refCampeonats) : 1;
-      ops.push({prova:m.prova,pct:pct||0,pts:ptsFinals,real:true});
+      // Evitar duplicats de prova (queda la millor marca)
+      const exist=ops.find(o=>o.prova===m.prova);
+      if(exist){if(ptsFinals>exist.pts){exist.pts=ptsFinals;exist.pct=pct||0;}}
+      else ops.push({prova:m.prova,pct:pct||0,pts:ptsFinals,real:true});
     });
     ops.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
-    // Afegir proves d'especialitat sense marca (1pt) si no en té
+    // Afegir proves d'especialitat sense marca (1pt)
     const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
     if(esp){
       ESP_MAP[esp].forEach(p=>{
@@ -974,154 +976,261 @@ async function runOptimizer(){
     return ops;
   }
 
-  // ── FASE 1: Assignar proves individuals greedy per pts (màx 2 per atleta) ──
-  // Construïm totes les opcions i ordenem per pts DESC
-  const allOps=[];
-  act.forEach(a=>{
-    getOpsInd(a).forEach(op=>{
-      allOps.push({nom:a.nom,fil:!!a.filial,...op});
-    });
-  });
-  allOps.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
-
-  for(const op of allOps){
-    const{nom,fil,prova}=op;
-    if(cob[prova]) continue;       // prova ja coberta per altra atleta
-    if(nPA[nom]>=2) continue;      // atleta ja té 2 proves
-    if(fil&&tf>=4) continue;       // límit filials
-    const slot=nPA[nom];
-    ns[nom][slot]={prova,pct:null,man:false};
-    cob[prova]=nom;
-    nPA[nom]++;
-    if(fil)tf++;
+  // ── Punts totals actuals d'una atleta en l'assignació ns ──
+  function ptsActualsNS(a){
+    return ns[a.nom]
+      .filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova))
+      .reduce((s,r)=>{
+        const pct=bestPct(a,r.prova,r);
+        return s+estPts(r.prova,pct,refCampeonats);
+      },0);
   }
 
-  // ── FASE 2: Atletes amb 1 prova → intentar afegir-ne una 2a ──
-  // (ja cobert pel greedy anterior si hi ha opcions disponibles)
+  // ── FASE 1: Assignació òptima per proves (Normes 1, 2, 3, 4) ──
+  //
+  // Algorisme:
+  // Per cada prova, mirem totes les atletes candidates.
+  // Construïm una matriu de [atleta × prova] → pts.
+  // Fem una assignació iterativa intel·ligent:
+  //   - Prova a prova, per a cada prova agafem la millor atleta disponible.
+  //   - Però aplicant la Norma 3: si una atleta té moltes proves bones,
+  //     potser és millor "cedir" una prova per alliberar-la a una altra.
+  //   - Norma 2: desempat per "menys alternatives disponibles".
+  //   - Norma 4: desempat filial vs club → guanya la del club.
 
-  // ── FASE 3: Relleu 4x100 — OBLIGATORI per al 75% ──
-  // Escollir les 4 atletes que menys puntuen en les seves proves individuals
-  // (o que no tenen cap prova assignada), respectant límit filials
+  // Construïm mapa complet: per cada atleta, les seves opcions amb puntuació
+  const opsPerAtleta={};
+  act.forEach(a=>{ opsPerAtleta[a.nom]=getOpsInd(a); });
+
+  // Funció: per a una atleta, quantes proves del campionat pot cobrir amb ≥1pt
+  function nAlternatives(a, exclProves=new Set()){
+    return opsPerAtleta[a.nom].filter(o=>!exclProves.has(o.prova)&&!isReleu(o.prova)).length;
+  }
+
+  // Funció principal d'assignació òptima (Hungarian-inspired greedy amb backtracking lleuger)
+  // Estratègia: iterar per proves, per cada prova calcular la millor atleta tenint en compte
+  // l'impacte global (Norma 3).
+  function assignarProves(){
+    // Ordenem les proves per "competitivitat" → les proves amb menys candidates primeres
+    // (les difícils de cobrir es decideixen primer)
+    const provesOrdenades = [...CAMP_PROVES_IND].sort((p1,p2)=>{
+      const n1=act.filter(a=>opsPerAtleta[a.nom].find(o=>o.prova===p1)&&nPA[a.nom]<2&&!(a.filial&&tf>=4)).length;
+      const n2=act.filter(a=>opsPerAtleta[a.nom].find(o=>o.prova===p2)&&nPA[a.nom]<2&&!(a.filial&&tf>=4)).length;
+      return n1-n2; // proves amb menys candidates primer
+    });
+
+    for(const prova of provesOrdenades){
+      if(cob[prova]) continue;
+
+      // Candidates vàlides per aquesta prova
+      const candidates = act
+        .filter(a=> !excluded.includes(a.nom)
+                 && nPA[a.nom]<2
+                 && !(a.filial && tf>=4)
+                 && !ns[a.nom].find(r=>r.prova===prova) // no l'ha assignada ja
+        )
+        .map(a=>{
+          const op=opsPerAtleta[a.nom].find(o=>o.prova===prova);
+          const pts=op?op.pts:1; // si no té marca → 1pt (Norma 5)
+          // Norma 3: "cost d'oportunitat" — quants punts perd el global si posem aquesta atleta aquí
+          // Si l'atleta té moltes opcions bones, el cost és baix (podem posar-la aquí sense perdre molt)
+          // Si l'atleta té poques opcions alternatives, el cost és alt
+          const altsSenseAquesta = opsPerAtleta[a.nom].filter(o=>o.prova!==prova&&!isReleu(o.prova)&&!cob[o.prova]);
+          const millorAlt = altsSenseAquesta.length>0 ? altsSenseAquesta[0].pts : 0;
+          // Valor net: quant aporta posar-la aquí vs la seva millor alternativa disponible
+          const valorNet = pts - millorAlt * 0.5; // factor 0.5: ponderem l'alternativa
+          return{a, pts, op, valorNet, nAlts:altsSenseAquesta.length};
+        })
+        .filter(c=>c.pts>0||c.op||nAlternatives(c.a)===0); // sempre incloure si no té alternatives
+
+      if(!candidates.length) continue;
+
+      // Ordenació seguint les normes:
+      // 1) Major pts en AQUESTA prova (Norma 1)
+      // 2) Si empat de pts → la que té menys alternatives (Norma 2)
+      // 3) Si segueix empat → valor net considerant Norma 3
+      // 4) Si segueix empat → preferim la del club (no filial) (Norma 4)
+      candidates.sort((x,y)=>{
+        if(y.pts!==x.pts) return y.pts-x.pts;         // Norma 1: més pts
+        if(x.nAlts!==y.nAlts) return x.nAlts-y.nAlts; // Norma 2: menys alternatives
+        if(y.valorNet!==x.valorNet) return y.valorNet-x.valorNet; // Norma 3
+        // Norma 4: desempat filial — guanya la no filial
+        const xFil=x.a.filial?1:0, yFil=y.a.filial?1:0;
+        return xFil-yFil;
+      });
+
+      const guanyadora=candidates[0];
+      const slot=nPA[guanyadora.a.nom];
+      ns[guanyadora.a.nom][slot]={prova,pct:null,man:false};
+      cob[prova]=guanyadora.a.nom;
+      nPA[guanyadora.a.nom]++;
+      if(guanyadora.a.filial) tf++;
+    }
+
+    // ── Segona passada: atletes amb 1 prova assignada → intentar 2a prova ──
+    // Ara que l'assignació principal ha acabat, omplim 2es proves
+    const provesLliures2=[...CAMP_PROVES_IND].filter(p=>!cob[p]);
+    const atletesAmbSlot=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
+
+    // Per cada prova lliure, millor atleta amb slot disponible
+    provesLliures2.sort((p1,p2)=>{
+      const n1=atletesAmbSlot.filter(a=>opsPerAtleta[a.nom].find(o=>o.prova===p1)).length;
+      const n2=atletesAmbSlot.filter(a=>opsPerAtleta[a.nom].find(o=>o.prova===p2)).length;
+      return n1-n2;
+    });
+
+    for(const prova of provesLliures2){
+      if(cob[prova]) continue;
+      const cands2=atletesAmbSlot
+        .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
+        .map(a=>{
+          const op=opsPerAtleta[a.nom].find(o=>o.prova===prova);
+          const pts=op?op.pts:1;
+          return{a,pts,nAlts:nAlternatives(a,new Set([prova]))};
+        })
+        .sort((x,y)=>y.pts-x.pts||x.nAlts-y.nAlts||(x.a.filial?1:0)-(y.a.filial?1:0));
+      if(!cands2.length) continue;
+      const g=cands2[0];
+      ns[g.a.nom][nPA[g.a.nom]]={prova,pct:null,man:false};
+      cob[prova]=g.a.nom;
+      nPA[g.a.nom]++;
+      if(g.a.filial) tf++;
+    }
+  }
+
+  assignarProves();
+
+  // ── FASE 2: Prova d'intercanvi (Norma 3 refinament) ──
+  // Intentem millorar la puntuació total fent intercanvis entre atletes:
+  // Si atleta A té prova X i atleta B té prova Y, i intercanviant guanyem punts → fem l'intercanvi
+  let millorat=true;
+  let iteracions=0;
+  while(millorat && iteracions<20){
+    millorat=false; iteracions++;
+    const atletesAss=act.filter(a=>nPA[a.nom]>0);
+    for(const a of atletesAss){
+      for(let si=0;si<ns[a.nom].length;si++){
+        const provaA=ns[a.nom][si]?.prova;
+        if(!provaA||provaA==='—'||isReleu(provaA)) continue;
+        const ptsA=opsPerAtleta[a.nom].find(o=>o.prova===provaA)?.pts||1;
+        // Busquem una atleta B que tingui una prova que A pugui fer millor
+        for(const b of atletesAss){
+          if(b.nom===a.nom) continue;
+          for(let sj=0;sj<ns[b.nom].length;sj++){
+            const provaB=ns[b.nom][sj]?.prova;
+            if(!provaB||provaB==='—'||isReleu(provaB)) continue;
+            if(provaA===provaB) continue;
+            const ptsB=opsPerAtleta[b.nom].find(o=>o.prova===provaB)?.pts||1;
+            // Pot A fer provaB? Pot B fer provaA?
+            const ptsAaB=opsPerAtleta[a.nom].find(o=>o.prova===provaB)?.pts;
+            const ptsBaA=opsPerAtleta[b.nom].find(o=>o.prova===provaA)?.pts;
+            if(ptsAaB===undefined||ptsBaA===undefined) continue;
+            // Guany net de l'intercanvi
+            const guanyActual=ptsA+ptsB;
+            const guanyIntercanvi=ptsAaB+ptsBaA;
+            if(guanyIntercanvi>guanyActual){
+              // Norma 4: si un és filial i l'altre del club, i els pts són iguals → preferim club
+              // (aquí guanyIntercanvi>guanyActual, és millor fer-ho sempre)
+              ns[a.nom][si]={prova:provaB,pct:null,man:false};
+              ns[b.nom][sj]={prova:provaA,pct:null,man:false};
+              cob[provaA]=b.nom; cob[provaB]=a.nom;
+              millorat=true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ── FASE 3: Proves buides → cobrir amb atletes sense slot (Norma 5: mínim 1pt) ──
+  CAMP_PROVES_IND.forEach(prova=>{
+    if(cob[prova]) return;
+    const lliures=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
+    if(!lliures.length) return;
+    const scored=lliures.map(a=>{
+      const op=opsPerAtleta[a.nom].find(o=>o.prova===prova);
+      return{a,pts:op?op.pts:1,pri:op?0:1};
+    }).sort((x,y)=>x.pri-y.pri||y.pts-x.pts||(x.a.filial?1:0)-(y.a.filial?1:0));
+    const g=scored[0];
+    ns[g.a.nom][nPA[g.a.nom]]={prova,pct:null,man:false};
+    cob[prova]=g.a.nom;
+    nPA[g.a.nom]++;
+    if(g.a.filial) tf++;
+  });
+
+  // ── FASE 4: Relleu 4x100 — OBLIGATORI (Norma 6) ──
+  // S'assignen les atletes que queden sense proves o amb menys punts (les que "sobren")
   const rel100='Relleu 4x100';
   const newRel100=[];
 
-  // Ordenem per: primer les que tenen 0 proves, després les que puntuen menys
+  // Candidats: preferim les que no tenen cap prova individual o les que puntuen menys
   // i que encara poden afegir una prova (nPA < 2)
-  const cands100=act
+  let cands100=act
     .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4))
-    .map(a=>{
-      // Punts totals actuals de l'atleta en proves individuals
-      const ptsActuals=ns[a.nom]
-        .filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova))
-        .reduce((s,r)=>{
-          const pct=bestPct(a,r.prova,r);
-          return s+estPts(r.prova,pct,refCampeonats);
-        },0);
-      return{a,ptsActuals,nProv:nPA[a.nom]};
-    })
-    // Prioritat: menys proves primer, dins del mateix nProv menys punts primer
+    .map(a=>({a,ptsActuals:ptsActualsNS(a),nProv:nPA[a.nom]}))
     .sort((x,y)=>x.nProv-y.nProv||x.ptsActuals-y.ptsActuals)
     .slice(0,4);
 
-  if(cands100.length>=4){
-    cands100.forEach(({a})=>{
-      newRel100.push(a.nom);
-      const slot=nPA[a.nom];
-      ns[a.nom][slot]={prova:rel100,pct:null,man:false};
-      nPA[a.nom]++;
-      if(a.filial)tf++;
-    });
-  } else {
-    // Si no hi ha 4 candidates lliures, agafem les que puntuen menys globalment
-    act
+  if(cands100.length<4){
+    // No hi ha prou atletes lliures → agafem les que puntuen menys globalment
+    // (fins i tot si ja tenen 2 proves, els traiem la que val menys)
+    const totsOrdenats=act
       .filter(a=>!(a.filial&&tf>=4))
-      .map(a=>{
-        const ptsActuals=ns[a.nom]
-          .filter(r=>r.prova&&r.prova!=='—'&&!isReleu(r.prova))
-          .reduce((s,r)=>{
-            const pct=bestPct(a,r.prova,r);
-            return s+estPts(r.prova,pct,refCampeonats);
-          },0);
-        return{a,ptsActuals};
-      })
-      .sort((x,y)=>x.ptsActuals-y.ptsActuals)
-      .slice(0,4)
-      .forEach(({a})=>{
-        // Si ja té 2 proves, substituïm la que puntua menys per el relleu
-        if(nPA[a.nom]>=2){
-          const minSlot=ns[a.nom]
-            .map((r,i)=>({r,i,pts:estPts(r.prova,bestPct(a,r.prova,r),refCampeonats)}))
-            .filter(x=>!isReleu(x.r.prova)&&x.r.prova!=='—')
-            .sort((a,b)=>a.pts-b.pts)[0];
-          if(minSlot&&minSlot.pts<=4){
-            delete cob[minSlot.r.prova];
-            ns[a.nom][minSlot.i]={prova:rel100,pct:null,man:false};
-          }
-        } else {
-          const slot=nPA[a.nom];
-          ns[a.nom][slot]={prova:rel100,pct:null,man:false};
-          nPA[a.nom]++;
-          if(a.filial)tf++;
+      .map(a=>({a,ptsActuals:ptsActualsNS(a)}))
+      .sort((x,y)=>x.ptsActuals-y.ptsActuals);
+    const jaAssignats=new Set(cands100.map(c=>c.a.nom));
+    for(const {a} of totsOrdenats){
+      if(jaAssignats.has(a.nom)) continue;
+      if(cands100.length>=4) break;
+      if(nPA[a.nom]>=2){
+        // Treure la prova individual que menys punts dóna
+        const minSlot=ns[a.nom]
+          .map((r,i)=>({r,i,pts:estPts(r.prova,bestPct(a,r.prova,r),refCampeonats)}))
+          .filter(x=>!isReleu(x.r.prova)&&x.r.prova!=='—')
+          .sort((u,v)=>u.pts-v.pts)[0];
+        if(minSlot){
+          delete cob[minSlot.r.prova];
+          ns[a.nom][minSlot.i]={prova:'—',pct:null,man:false};
+          nPA[a.nom]--;
         }
-        newRel100.push(a.nom);
-      });
-  }
-
-  // ── FASE 4: Proves sueltes — omplir proves buides amb atletes amb slot lliure ──
-  const actSeg=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
-  const allOps2=[];
-  actSeg.forEach(a=>{
-    getOpsInd(a).forEach(op=>{
-      if(!cob[op.prova]) allOps2.push({nom:a.nom,fil:!!a.filial,...op});
-    });
-  });
-  allOps2.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
-  for(const op of allOps2){
-    const{nom,fil,prova}=op;
-    if(cob[prova])continue;
-    if(nPA[nom]>=2)continue;
-    if(fil&&tf>=4)continue;
-    ns[nom][nPA[nom]]={prova,pct:null,man:false};
-    cob[prova]=nom;
-    nPA[nom]++;
-    if(fil)tf++;
-  }
-
-  // ── FASE 4b: Proves encara buides — cobrir amb qualsevol atleta amb slot lliure ──
-  // Prioritat: 1) té marca, 2) té especialitat compatible, 3) qualsevol (1pt)
-  const provesInd = CAMP_PROVES_IND || PROVES.filter(p=>p!=='—'&&!isReleu(p));
-  provesInd.forEach(prova=>{
-    if(cob[prova]) return;
-    const lliures = act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
-    if(!lliures.length) return;
-
-    const scored = lliures.map(a=>{
-      const m=(a.marques||[]).find(mm=>mm.prova===prova);
-      if(m){
-        const pct=calcPct(prova,m.marca,a.dob,m.any);
-        return{a,pts:pct!==null?estPts(prova,pct,refCampeonats):1,pct:pct||0,pri:0};
       }
-      const esp=(a.notes||'').toUpperCase().split(/[,\s]+/).find(k=>ESP_MAP[k]);
-      if(esp&&ESP_MAP[esp].includes(prova))
-        return{a,pts:1,pct:0,pri:1};
-      // Qualsevol atleta amb slot lliure → 1pt (últim recurs)
-      return{a,pts:1,pct:0,pri:2};
-    }).sort((a,b)=>a.pri-b.pri||b.pts-a.pts||b.pct-a.pct);
+      cands100.push({a,ptsActuals:ptsActualsNS(a),nProv:nPA[a.nom]});
+      jaAssignats.add(a.nom);
+    }
+  }
 
-    const cand=scored[0];
-    cob[prova]=cand.a.nom;
-    ns[cand.a.nom][nPA[cand.a.nom]]={prova,pct:null,man:false};
-    nPA[cand.a.nom]++;
-    if(cand.a.filial)tf++;
+  cands100.slice(0,4).forEach(({a})=>{
+    newRel100.push(a.nom);
+    const slot=nPA[a.nom];
+    ns[a.nom][slot]={prova:rel100,pct:null,man:false};
+    nPA[a.nom]++;
+    if(a.filial) tf++;
   });
 
-  // ── FASE 5: Relleu 4x400 — NOMÉS si hi ha 4 atletes amb slot lliure ──
+  // ── FASE 5: Proves buides restants (2a passada post-relleu) ──
+  CAMP_PROVES_IND.forEach(prova=>{
+    if(cob[prova]) return;
+    const lliures=act.filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4));
+    if(!lliures.length) return;
+    const scored=lliures.map(a=>{
+      const op=opsPerAtleta[a.nom].find(o=>o.prova===prova);
+      return{a,pts:op?op.pts:1,pri:op?0:1};
+    }).sort((x,y)=>x.pri-y.pri||y.pts-x.pts||(x.a.filial?1:0)-(y.a.filial?1:0));
+    const g=scored[0];
+    ns[g.a.nom][nPA[g.a.nom]]={prova,pct:null,man:false};
+    cob[prova]=g.a.nom;
+    nPA[g.a.nom]++;
+    if(g.a.filial) tf++;
+  });
+
+  // ── FASE 6: Relleu 4x400 — NOMÉS si hi ha 4 atletes amb slot lliure (Norma 6) ──
   const rel400='Relleu 4x400';
   const newRel400=[];
   const cands400=act
     .filter(a=>nPA[a.nom]<2&&!(a.filial&&tf>=4)&&!newRel100.includes(a.nom))
     .map(a=>{
-      const pct=calcPct('400m',(a.marques||[]).find(m=>m.prova==='400m')?.marca||'',a.dob,new Date().getFullYear());
+      const m=(a.marques||[]).find(mm=>mm.prova==='400m');
+      const pct=m?calcPct('400m',m.marca,a.dob,m.any):null;
       return{a,pct:pct||0};
     })
     .sort((a,b)=>b.pct-a.pct)
@@ -1132,7 +1241,7 @@ async function runOptimizer(){
       newRel400.push(a.nom);
       ns[a.nom][nPA[a.nom]]={prova:rel400,pct:null,man:false};
       nPA[a.nom]++;
-      if(a.filial)tf++;
+      if(a.filial) tf++;
     });
   }
 
