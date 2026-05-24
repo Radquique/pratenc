@@ -956,7 +956,6 @@ async function runOptimizer() {
       if (p && p !== '—') m[p] = pc > 0 ? estPts(p, pc, refCampeonats) : 1;
     }
     const esp = (a.notes||'').toUpperCase().split(/[,\s]+/).find(k => ESP_MAP[k]);
-    // FIX: Sustituido isReleu(p) por p.startsWith('Relleu')
     if (esp) ESP_MAP[esp].forEach(p => { if (!m[p] && !p.startsWith('Relleu')) m[p] = 1; });
     m['Relleu 4x100'] = 0; 
     m['Relleu 4x400'] = 0;
@@ -1000,7 +999,7 @@ async function runOptimizer() {
       if (act[i].filial) tf += provesAtleta; 
     }
 
-    if (tf > 4) return -1; // Descartar si las filiales superan 4 pruebas
+    if (tf > 4) return -1; 
     if (r100 > 4 || r400 > 4) return -1; 
     
     if (r100 === 4) { score += 1; totalPlacesCob++; }
@@ -1019,7 +1018,7 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Simulación Rápida (40.000 iteraciones en milisegundos)
+  // 3. Simulación Rápida 
   const MAX_ITERS = 40000;
   let temp = 10.0;
   let currentScore = getScore(currState);
@@ -1063,13 +1062,19 @@ async function runOptimizer() {
     }
   }
 
-  // 4. Relleno inteligente 
-  const covered = new Set();
-  let totalFilialEvents = 0;
-  
+  // 4. Aplicar el resultat i actualitzar la pantalla
   act.forEach(a => {
-    if (bestState[a.nom]) {
-      best
+    const st = gst(a.nom);
+    st[0] = { prova: bestState[a.nom][0], pct: null, man: false };
+    st[1] = { prova: bestState[a.nom][1], pct: null, man: false };
+    simState[a.nom] = st;
+  });
+
+  saveSimState(simState);
+  render();
+  document.getElementById('sb').classList.add('show'); 
+  showToast('✓ Càlcul completat');
+}
 
 function updateSummary(){
   let tot=0,nAtl=0;const rows=[],pm2={};
