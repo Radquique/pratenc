@@ -932,188 +932,168 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
 
 async function runOptimizer() {
   if (!athletes.length) { showToast('No hi ha atletes'); return; }
-  showToast('⏳ Calculant màxim absolut...');
-  
-  // Pausa mínima para permitir que el DOM renderice el Toast
-  await new Promise(r => setTimeout(r, 60));
+  showToast('⏳ Calculant el màxim absolut...');
+  await new Promise(r => setTimeout(r, 60)); // Render buffer
 
-  const act = athletes.filter(a => !excluded.includes(a.nom));
-  const TIME_LIMIT_MS = 2500; // Tiempo máximo de búsqueda (2.5 segundos)
   const startTime = Date.now();
-
-  // 1. Preparar matriz de opciones válidas para cada atleta
-  const opsMap = {};
-  const maxPtsIndividual = {}; // Para calcular la cota superior (upper bound)
+  const TIME_LIMIT = 2500; // 2.5s límite
+  const act = athletes.filter(a => !excluded.includes(a.nom));
   
+  // 1. Preparar matriz de opciones
+  const ops = {};
+  const ESP_MAP = {
+    'VELOCISTA':['100m','200m','Tanques Altes'],
+    'MIG FONS':['400m','800m','Tanques Baixes'],
+    'FONS':['1500m','3000m','800m','2000m obstacles'],
+    'COMBINADES':['Salt alçada','Salt llargada','Triple salt','Tanques Altes','100m','400m','Llançament pes','Llançament javelina'],
+    'LLANÇAMENTS':['Llançament disc','Llançament martell','Martell Pesat','Llançament pes','Llançament javelina'],
+    'SALT':['Salt alçada','Salt llargada','Triple salt','Salt perxa'],
+    'PERXA':['Salt perxa','100m'],
+    'MARXA':['3000m marxa']
+  };
+
   act.forEach(a => {
-    opsMap[a.nom] = [];
+    const m = {};
     for (const [p, pc] of suggs(a)) {
-      if (!p || p === '—' || isReleu(p)) continue;
-      const pts = pc > 0 ? estPts(p, pc, refCampeonats) : 1;
-      opsMap[a.nom].push({ prova: p, pct: pc || 0, pts });
+      if (p && p !== '—') m[p] = pc > 0 ? estPts(p, pc, refCampeonats) : 1;
     }
-    // Especialidades sin marca (mínimo 1 pt)
-    const ESP_MAP = {
-      'VELOCISTA': ['100m','200m','Tanques Altes'],
-      'MIG FONS': ['400m','800m','Tanques Baixes'],
-      'FONS': ['1500m','3000m','800m','2000m obstacles'],
-      'COMBINADES': ['Salt alçada','Salt llargada','Triple salt','Tanques Altes','100m','400m','Llançament pes','Llançament javelina'],
-      'LLANÇAMENTS': ['Llançament disc','Llançament martell','Martell Pesat','Llançament pes','Llançament javelina'],
-      'SALT': ['Salt alçada','Salt llargada','Triple salt','Salt perxa'],
-      'PERXA': ['Salt perxa','100m'],
-      'MARXA': ['3000m marxa'],
-    };
-    const esp = (a.notes || '').toUpperCase().split(/[,\s]+/).find(k => ESP_MAP[k]);
-    if (esp) {
-      ESP_MAP[esp].forEach(p => {
-        if (!opsMap[a.nom].find(o => o.prova === p)) {
-          opsMap[a.nom].push({ prova: p, pct: 0, pts: 1 });
-        }
-      });
-    }
-    opsMap[a.nom].sort((x, y) => y.pts - x.pts);
+    const esp = (a.notes||'').toUpperCase().split(/[,\s]+/).find(k => ESP_MAP[k]);
+    if (esp) ESP_MAP[esp].forEach(p => { if (!m[p] && !isReleu(p)) m[p] = 1; });
+    m['Relleu 4x100'] = 0; // Se calcula en el score global
+    m['Relleu 4x400'] = 0;
+    ops[a.nom] = m;
   });
 
-  // Pre-calcular los puntos máximos teóricos por prueba para la poda
-  CAMP_PROVES_IND.forEach(p => {
-    let max = 0;
-    act.forEach(a => {
-      const o = opsMap[a.nom].find(x => x.prova === p);
-      if (o && o.pts > max) max = o.pts;
-    });
-    maxPtsIndividual[p] = max;
-  });
-
-  // 2. Variables de estado para el DFS (Búsqueda en Profundidad)
   let bestScore = -1;
-  let bestState = null;
-  
-  // Estado actual
-  const currentAssigned = {}; // prova -> nom
-  const currentAthleteCount = {}; // nom -> int (max 2)
-  act.forEach(a => currentAthleteCount[a.nom] = 0);
-  let currentFilialCount = 0;
-  let currentScore = 0;
+  let bestState = {};
+  let currState = {};
+  act.forEach(a => currState[a.nom] = [null, null]);
 
-  // 3. Motor Recursivo (Branch & Bound)
-  function solve(provaIndex) {
-    // Check de seguridad de tiempo
-    if (Date.now() - startTime > TIME_LIMIT_MS) return;
+  // 2. Evaluador Holístico (Incluye Relevos en tiempo real)
+  function getScore(state) {
+    let score = 0;
+    let tf = 0;
+    const cov = {};
+    let r100 = 0, r400 = 0;
 
-    // Condición de éxito: Hemos asignado todas las pruebas individuales
-    if (provaIndex === CAMP_PROVES_IND.length) {
-      if (currentScore > bestScore) {
-        bestScore = currentScore;
-        // Guardar clon profundo del mejor estado encontrado
-        bestState = { ...currentAssigned };
+    for (let i = 0; i < act.length; i++) {
+      const nom = act[i].nom;
+      const s = state[nom];
+      let hasFilialEvent = false;
+
+      for (let j = 0; j < 2; j++) {
+        const p = s[j];
+        if (!p) continue;
+        hasFilialEvent = true;
+
+        if (p === 'Relleu 4x100') r100++;
+        else if (p === 'Relleu 4x400') r400++;
+        else {
+          if (!cov[p]) {
+            cov[p] = true; // Solo 1 atleta puntúa por prueba
+            score += ops[nom][p] || 1;
+          }
+        }
       }
-      return;
+      if (act[i].filial && hasFilialEvent) tf++;
     }
 
-    const currentProva = CAMP_PROVES_IND[provaIndex];
+    if (tf > 4) return -1; // Límite de filiales excedido
+    if (r100 > 4 || r400 > 4) return -1; 
+    
+    // El relevo solo suma si está completo
+    if (r100 === 4) score += 4;
+    if (r400 === 4) score += 4;
+    
+    return score;
+  }
 
-    // Cota superior (Upper Bound): Si la puntuación actual + lo máximo teórico del resto 
-    // no supera el mejor récord, podamos esta rama entera.
-    let possibleRemaining = 0;
-    for (let i = provaIndex; i < CAMP_PROVES_IND.length; i++) {
-      possibleRemaining += maxPtsIndividual[CAMP_PROVES_IND[i]];
+  function cloneState(st) {
+    const c = {};
+    for (let i = 0; i < act.length; i++) {
+      const n = act[i].nom;
+      c[n] = [st[n][0], st[n][1]];
     }
-    if (currentScore + possibleRemaining <= bestScore) return;
+    return c;
+  }
 
-    // Buscar candidatos válidos para esta prueba
-    const candidates = act.map(a => {
-      if (currentAthleteCount[a.nom] >= 2) return null;
-      if (a.filial && currentFilialCount >= 4) return null;
-      const o = opsMap[a.nom].find(x => x.prova === currentProva);
-      return o ? { a, pts: o.pts } : null;
-    }).filter(x => x !== null).sort((x, y) => y.pts - x.pts);
-
-    // Opción A: Dejar la prueba vacía (a veces necesario para guardar atletas para pruebas mejores)
-    solve(provaIndex + 1);
-
-    // Opción B: Probar con los candidatos (solo los 5 mejores por prueba para evitar explosión combinatoria)
-    const MAX_CANDIDATES_PER_BRANCH = 5;
-    for (let i = 0; i < Math.min(candidates.length, MAX_CANDIDATES_PER_BRANCH); i++) {
-      const c = candidates[i];
-      
-      // Aplicar estado
-      currentAssigned[currentProva] = c.a.nom;
-      currentAthleteCount[c.a.nom]++;
-      if (c.a.filial) currentFilialCount++;
-      currentScore += c.pts;
-
-      // Explorar siguiente nivel
-      solve(provaIndex + 1);
-
-      // Deshacer estado (Backtracking)
-      delete currentAssigned[currentProva];
-      currentAthleteCount[c.a.nom]--;
-      if (c.a.filial) currentFilialCount--;
-      currentScore -= c.pts;
+  // 3. Motor Estocástico (Simulated Annealing)
+  let iters = 0;
+  let temp = 10.0;
+  let currentScore = getScore(currState);
+  
+  while (Date.now() - startTime < TIME_LIMIT) {
+    iters++;
+    
+    // Mutación aleatoria
+    const aIdx = Math.floor(Math.random() * act.length);
+    const aName = act[aIdx].nom;
+    const slot = Math.floor(Math.random() * 2);
+    const oldP = currState[aName][slot];
+    
+    const availableProves = Object.keys(ops[aName]).concat([null]);
+    const newP = availableProves[Math.floor(Math.random() * availableProves.length)];
+    
+    if (newP === oldP) continue;
+    if (newP && currState[aName][1-slot] === newP) continue; // Evitar duplicados
+    
+    currState[aName][slot] = newP;
+    const newScore = getScore(currState);
+    
+    if (newScore > bestScore) {
+      bestScore = newScore;
+      bestState = cloneState(currState);
+    }
+    
+    // ¿Aceptar empeorar temporalmente para desatascar el algoritmo?
+    if (newScore < currentScore) {
+      const delta = currentScore - newScore;
+      if (Math.random() > Math.exp(-delta / temp)) {
+        currState[aName][slot] = oldP; // Rechazar
+      } else {
+        currentScore = newScore; // Aceptar
+      }
+    } else {
+      currentScore = newScore; 
+    }
+    
+    temp *= 0.9999; // Enfriamiento
+    
+    // Random Restarts (Volver al mejor punto y recalentar si se pierde)
+    if (iters % 8000 === 0) {
+      currState = cloneState(bestState);
+      currentScore = bestScore;
+      temp = 5.0; 
     }
   }
 
-  // Lanzar el motor para pruebas individuales
-  solve(0);
-
-  // 4. Aplicar el mejor resultado individual encontrado al estado global
+  // 4. Aplicar la alineación ganadora
   const ns = {};
+  simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
+
   act.forEach(a => {
-    ns[a.nom] = [{ prova: '—', pct: null, man: false }, { prova: '—', pct: null, man: false }];
-  });
-
-  Object.entries(bestState).forEach(([prova, nom]) => {
-    const a = aObj(nom);
-    const sl = ns[nom].findIndex(r => !r.prova || r.prova === '—');
-    if (sl >= 0) {
-      ns[nom][sl] = { prova, pct: null, man: false };
-    }
-  });
-
-  let tf = act.filter(a => a.filial && ns[a.nom].some(r => r.prova !== '—')).length;
-
-  // 5. Gestión estricta de Relleus post-optimización
-  // Calculamos qué atletas tienen hueco sin destruir la puntuación base.
-  const newRel100 = [];
-  const newRel400 = [];
-  
-  function fillRelay(relayArray, relayName) {
-    const rcands = act.filter(a => !(a.filial && tf >= 4))
-      .map(a => {
-        const slotsUsados = ns[a.nom].filter(r => r.prova !== '—').length;
-        return { a, slotsUsados };
-      })
-      .filter(x => x.slotsUsados < 2) // Solo quienes tienen slots libres
-      .sort((x, y) => x.slotsUsados - y.slotsUsados); // Priorizar a las que tienen 0 pruebas
-      
-    if (rcands.length >= 4) {
-      for (let i = 0; i < 4; i++) {
-        const at = rcands[i].a;
-        relayArray.push(at.nom);
-        const fs = ns[at.nom].findIndex(r => r.prova === '—');
-        ns[at.nom][fs] = { prova: relayName, pct: null, man: false };
-        if (at.filial) tf++;
+    ns[a.nom] = [
+      { prova: bestState[a.nom][0] || '—', pct: null, man: false },
+      { prova: bestState[a.nom][1] || '—', pct: null, man: false }
+    ];
+    // Rellenar visualmente la UI de relevos
+    [0, 1].forEach(slot => {
+      const p = bestState[a.nom][slot];
+      if (isReleu(p)) {
+        const rIdx = simRelState[p].indexOf(null);
+        if (rIdx !== -1) simRelState[p][rIdx] = a.nom;
       }
-    }
-  }
-
-  fillRelay(newRel100, 'Relleu 4x100');
-  fillRelay(newRel400, 'Relleu 4x400');
-
-  // Guardar estado final
-  simRelState = {};
-  simRelState['Relleu 4x100'] = newRel100.concat([null, null, null, null]).slice(0, 4);
-  simRelState['Relleu 4x400'] = newRel400.concat([null, null, null, null]).slice(0, 4);
+    });
+  });
 
   simState = ns;
   await saveSimState(simState);
   await saveRelState(simRelState);
-  
   render();
   document.getElementById('sb').classList.add('show');
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  showToast(`▶ Simulació completada en ${elapsed}s!`);
+  showToast(`▶ Màxim trobat (${bestScore} pts) en ${elapsed}s! [Iters: ${iters}]`);
 }
 
 function updateSummary(){
