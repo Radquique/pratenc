@@ -932,7 +932,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
 
 async function runOptimizer() {
   if (!athletes.length) { showToast('No hi ha atletes'); return; }
-  showToast('⏳ Calculant el màxim absolut...');
+  showToast('⏳ Calculant la alineació estratègica...');
   await new Promise(r => setTimeout(r, 60)); // Render buffer
 
   const startTime = Date.now();
@@ -969,23 +969,24 @@ async function runOptimizer() {
   let currState = {};
   act.forEach(a => currState[a.nom] = [null, null]);
 
-  // 2. Evaluador Holístico (CORREGIDO: Cuenta pruebas filiales correctamente)
+  // 2. Evaluador Holístico Avanzado
   function getScore(state) {
     let score = 0;
-    let tf = 0; // Total de pruebas ocupadas por filiales
+    let tf = 0; // Total pruebas de filiales
     const cov = {};
     let r100 = 0, r400 = 0;
+    let totalPlacesCob = 0;
 
     for (let i = 0; i < act.length; i++) {
       const nom = act[i].nom;
       const s = state[nom];
-      let provesAquestFilial = 0;
+      let provesAtleta = 0;
 
       for (let j = 0; j < 2; j++) {
         const p = s[j];
         if (!p) continue;
         
-        provesAquestFilial++; // Contabiliza CADA prueba de esta atleta
+        provesAtleta++;
 
         if (p === 'Relleu 4x100') r100++;
         else if (p === 'Relleu 4x400') r400++;
@@ -993,21 +994,24 @@ async function runOptimizer() {
           if (!cov[p]) {
             cov[p] = true;
             score += ops[nom][p] || 1;
+            totalPlacesCob++;
           }
         }
       }
-      // Bug arreglado: Sumamos la cantidad de pruebas, no la atleta
-      if (act[i].filial) tf += provesAquestFilial; 
+      if (act[i].filial) tf += provesAtleta; 
     }
 
-    if (tf > 4) return -1; // Castigo si se pasa de 4 filiales en total
+    if (tf > 4) return -1; // Límite estricto de pruebas de filiales
     if (r100 > 4 || r400 > 4) return -1; 
     
-    if (r100 === 4) score += 4;
-    if (r400 === 4) score += 4;
+    // Modificación estratégica: Los relevos completos solo suman 1 punto para priorizar individuales
+    if (r100 === 4) { score += 1; totalPlacesCob++; }
+    if (r400 === 4) { score += 1; totalPlacesCob++; }
     
-    // Desempate: ante misma puntuación, preferimos estados que cubran más pruebas individuales
-    return score + (Object.keys(cov).length * 0.001); 
+    // Norma del 75%: Obligatorio alcanzar mínimo 21 plazas cubiertas totales
+    if (totalPlacesCob < 21) return -1;
+    
+    return score + (totalPlacesCob * 0.001); 
   }
 
   function cloneState(st) {
@@ -1016,7 +1020,7 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Motor Estocástico
+  // 3. Motor de Permutaciones de Bloque Estocástico
   let iters = 0;
   let temp = 10.0;
   let currentScore = getScore(currState);
@@ -1061,7 +1065,7 @@ async function runOptimizer() {
     }
   }
 
-  // 4. FASE DE RELLENO (CORRECCIÓN: Tapa los huecos de 1 punto automáticamente)
+  // 4. FASE DE RELLENO PROTEGIDA (No altera los límites regulatorios)
   const covered = new Set();
   let totalFilialEvents = 0;
   
@@ -1075,24 +1079,25 @@ async function runOptimizer() {
   });
 
   for (const prova of CAMP_PROVES_IND) {
-    if (covered.has(prova)) continue; // Si ya tiene asignado alguien, saltar
+    if (covered.has(prova)) continue; 
     
-    // Buscar la primera atleta disponible que pueda tapar el hueco
     for (const a of act) {
       const s = bestState[a.nom];
-      if (s[0] && s[1]) continue; // Ya tiene 2 pruebas
-      if (s[0] === prova || s[1] === prova) continue; // Evitar duplicar a la misma atleta en la misma prueba
-      if (a.filial && totalFilialEvents >= 4) continue; // Respetar límite de filiales
+      if (s[0] && s[1]) continue; 
+      if (s[0] === prova || s[1] === prova) continue; 
+      
+      // Control antibugs: Si meter la prueba rompe las 4 del bloque filial, saltar atleta
+      if (a.filial && totalFilialEvents >= 4) continue; 
       
       const slot = s[0] ? 1 : 0;
       s[slot] = prova;
       covered.add(prova);
       if (a.filial) totalFilialEvents++;
-      break; // Hueco tapado, pasar a la siguiente prueba vacía
+      break; 
     }
   }
 
-  // 5. Aplicar la alineación al UI
+  // 5. Traspaso y renderizado final en la UI
   const ns = {};
   simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
 
@@ -1117,7 +1122,7 @@ async function runOptimizer() {
   document.getElementById('sb').classList.add('show');
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  showToast(`▶ Simulació completada en ${elapsed}s!`);
+  showToast(`▶ Simulació completada amb èxit estructural en ${elapsed}s!`);
 }
 
 function updateSummary(){
