@@ -969,10 +969,10 @@ async function runOptimizer() {
   let currState = {};
   act.forEach(a => currState[a.nom] = [null, null]);
 
-  // 2. Evaluador Holístico Avanzado
+  // 2. Evaluador Holístico con Penalización No-Bloqueante
   function getScore(state) {
     let score = 0;
-    let tf = 0; // Total pruebas de filiales
+    let tf = 0; // Cómputo total de PRUEBAS hechas por filiales
     const cov = {};
     let r100 = 0, r400 = 0;
     let totalPlacesCob = 0;
@@ -1001,15 +1001,18 @@ async function runOptimizer() {
       if (act[i].filial) tf += provesAtleta; 
     }
 
-    if (tf > 4) return -1; // Límite estricto de pruebas de filiales
+    // Filtros duros insalvables (Límite estricto de 4 pruebas de filiales en total)
+    if (tf > 4) return -1; 
     if (r100 > 4 || r400 > 4) return -1; 
     
-    // Modificación estratégica: Los relevos completos solo suman 1 punto para priorizar individuales
+    // Sumar 1 punto estratégico por relevo completo para priorizar individuales libres
     if (r100 === 4) { score += 1; totalPlacesCob++; }
     if (r400 === 4) { score += 1; totalPlacesCob++; }
     
-    // Norma del 75%: Obligatorio alcanzar mínimo 21 plazas cubiertas totales
-    if (totalPlacesCob < 21) return -1;
+    // Penalización progresiva si no se llega al mínimo legal de 21 plazas (75%)
+    if (totalPlacesCob < 21) {
+      score -= (21 - totalPlacesCob) * 50; 
+    }
     
     return score + (totalPlacesCob * 0.001); 
   }
@@ -1020,7 +1023,7 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Motor de Permutaciones de Bloque Estocástico
+  // 3. Motor de Permutaciones Estocásticas
   let iters = 0;
   let temp = 10.0;
   let currentScore = getScore(currState);
@@ -1065,17 +1068,19 @@ async function runOptimizer() {
     }
   }
 
-  // 4. FASE DE RELLENO PROTEGIDA (No altera los límites regulatorios)
+  // 4. FASE DE RELLENO ULTRA PROTEGIDA (Respeta el límite de 4 pruebas filiales)
   const covered = new Set();
   let totalFilialEvents = 0;
   
   act.forEach(a => {
-    bestState[a.nom].forEach(p => {
-      if (p) {
-        if (!isReleu(p)) covered.add(p);
-        if (a.filial) totalFilialEvents++;
-      }
-    });
+    if (bestState[a.nom]) {
+      bestState[a.nom].forEach(p => {
+        if (p) {
+          if (!isReleu(p)) covered.add(p);
+          if (a.filial) totalFilialEvents++;
+        }
+      });
+    }
   });
 
   for (const prova of CAMP_PROVES_IND) {
@@ -1083,10 +1088,10 @@ async function runOptimizer() {
     
     for (const a of act) {
       const s = bestState[a.nom];
-      if (s[0] && s[1]) continue; 
+      if (!s || (s[0] && s[1])) continue; 
       if (s[0] === prova || s[1] === prova) continue; 
       
-      // Control antibugs: Si meter la prueba rompe las 4 del bloque filial, saltar atleta
+      // Bloqueo estricto: si la atleta es filial y ya hemos alcanzado las 4 pruebas, no se le asigna nada más
       if (a.filial && totalFilialEvents >= 4) continue; 
       
       const slot = s[0] ? 1 : 0;
@@ -1102,12 +1107,13 @@ async function runOptimizer() {
   simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
 
   act.forEach(a => {
+    const s = bestState[a.nom] || [null, null];
     ns[a.nom] = [
-      { prova: bestState[a.nom][0] || '—', pct: null, man: false },
-      { prova: bestState[a.nom][1] || '—', pct: null, man: false }
+      { prova: s[0] || '—', pct: null, man: false },
+      { prova: s[1] || '—', pct: null, man: false }
     ];
     [0, 1].forEach(slot => {
-      const p = bestState[a.nom][slot];
+      const p = s[slot];
       if (isReleu(p)) {
         const rIdx = simRelState[p].indexOf(null);
         if (rIdx !== -1) simRelState[p][rIdx] = a.nom;
@@ -1118,11 +1124,13 @@ async function runOptimizer() {
   simState = ns;
   await saveSimState(simState);
   await saveRelState(simRelState);
+  
   render();
-  document.getElementById('sb').classList.add('show');
+  const sb = document.getElementById('sb');
+  if (sb) sb.classList.add('show');
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  showToast(`▶ Simulació completada amb èxit estructural en ${elapsed}s!`);
+  showToast(`▶ Simulació completada amb èxit en ${elapsed}s!`);
 }
 
 function updateSummary(){
