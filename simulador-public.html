@@ -939,7 +939,7 @@ async function runOptimizer() {
   const TIME_LIMIT = 2500; // 2.5s límite
   const act = athletes.filter(a => !excluded.includes(a.nom));
   
-  // 1. Preparar matriz de opciones rápidas (Puntos grandes)
+  // 1. Matriz de opciones y pre-cálculo de puntuaciones
   const ops = {};
   const ESP_MAP = {
     'VELOCISTA':['100m','200m','Tanques Altes'],
@@ -967,7 +967,7 @@ async function runOptimizer() {
   let bestScore = -1;
   let bestState = {};
   let currState = {};
-  act.forEach(a => currState[a.nom] = [null, null]);
+  act.forEach(a => currState[a.nom] = ['—', '—']);
 
   // 2. Evaluador Holístico con Penalización No-Bloqueante
   function getScore(state) {
@@ -984,7 +984,7 @@ async function runOptimizer() {
 
       for (let j = 0; j < 2; j++) {
         const p = s[j];
-        if (!p) continue;
+        if (!p || p === '—') continue;
         
         provesAtleta++;
 
@@ -1001,15 +1001,12 @@ async function runOptimizer() {
       if (act[i].filial) tf += provesAtleta; 
     }
 
-    // Filtros duros insalvables (Límite estricto de 4 pruebas de filiales en total)
     if (tf > 4) return -1; 
     if (r100 > 4 || r400 > 4) return -1; 
     
-    // Sumar 1 punto estratégico por relevo completo para priorizar individuales libres
     if (r100 === 4) { score += 1; totalPlacesCob++; }
     if (r400 === 4) { score += 1; totalPlacesCob++; }
     
-    // Penalización progresiva si no se llega al mínimo legal de 21 plazas (75%)
     if (totalPlacesCob < 21) {
       score -= (21 - totalPlacesCob) * 50; 
     }
@@ -1023,7 +1020,7 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Motor de Permutaciones Estocásticas
+  // 3. Motor de Permutaciones (Simulated Annealing)
   let iters = 0;
   let temp = 10.0;
   let currentScore = getScore(currState);
@@ -1035,11 +1032,11 @@ async function runOptimizer() {
     const slot = Math.floor(Math.random() * 2);
     const oldP = currState[aName][slot];
     
-    const availableProves = Object.keys(ops[aName]).concat([null]);
+    const availableProves = Object.keys(ops[aName]).concat(['—']);
     const newP = availableProves[Math.floor(Math.random() * availableProves.length)];
     
     if (newP === oldP) continue;
-    if (newP && currState[aName][1-slot] === newP) continue; 
+    if (newP && newP !== '—' && currState[aName][1-slot] === newP) continue; 
     
     currState[aName][slot] = newP;
     const newScore = getScore(currState);
@@ -1068,14 +1065,14 @@ async function runOptimizer() {
     }
   }
 
-  // 4. FASE DE RELLENO ULTRA PROTEGIDA (Respeta el límite de 4 pruebas filiales)
+  // 4. FASE DE RELLENO ULTRA PROTEGIDA (Respeta el límite real de 4 pruebas de filiales)
   const covered = new Set();
   let totalFilialEvents = 0;
   
   act.forEach(a => {
     if (bestState[a.nom]) {
       bestState[a.nom].forEach(p => {
-        if (p) {
+        if (p && p !== '—') {
           if (!isReleu(p)) covered.add(p);
           if (a.filial) totalFilialEvents++;
         }
@@ -1088,13 +1085,12 @@ async function runOptimizer() {
     
     for (const a of act) {
       const s = bestState[a.nom];
-      if (!s || (s[0] && s[1])) continue; 
+      if (!s || (s[0] !== '—' && s[1] !== '—')) continue; 
       if (s[0] === prova || s[1] === prova) continue; 
       
-      // Bloqueo estricto: si la atleta es filial y ya hemos alcanzado las 4 pruebas, no se le asigna nada más
       if (a.filial && totalFilialEvents >= 4) continue; 
       
-      const slot = s[0] ? 1 : 0;
+      const slot = s[0] === '—' ? 0 : 1;
       s[slot] = prova;
       covered.add(prova);
       if (a.filial) totalFilialEvents++;
@@ -1102,30 +1098,42 @@ async function runOptimizer() {
     }
   }
 
-  // 5. Traspaso y renderizado final en la UI
+  // 5. Traspaso Exacto a la Estructura de Objetos del Simulador (Soluciona el cuelgue visual)
   const ns = {};
   simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
 
   act.forEach(a => {
-    const s = bestState[a.nom] || [null, null];
+    const s = bestState[a.nom] || ['—', '—'];
+    
+    // Aquí construimos el objeto exactamente como lo espera tu render()
     ns[a.nom] = [
       { prova: s[0] || '—', pct: null, man: false },
       { prova: s[1] || '—', pct: null, man: false }
     ];
+    
+    // Mapear marcas del mejor porcentaje real si la prueba asignada es válida
     [0, 1].forEach(slot => {
       const p = s[slot];
-      if (isReleu(p)) {
-        const rIdx = simRelState[p].indexOf(null);
-        if (rIdx !== -1) simRelState[p][rIdx] = a.nom;
+      if (p && p !== '—') {
+        if (isReleu(p)) {
+          const rIdx = simRelState[p].indexOf(null);
+          if (rIdx !== -1) simRelState[p][rIdx] = a.nom;
+        } else {
+          // Calculamos el porcentaje real directo para que la tabla pinte los puntos bien
+          ns[a.nom][slot].pct = bestPct(a, p, null);
+        }
       }
-    });
+    ]);
   });
 
+  // Guardamos en memoria global de la aplicación pública
   simState = ns;
   await saveSimState(simState);
   await saveRelState(simRelState);
   
+  // Llamamos a las funciones de pintado reales del simulador
   render();
+  
   const sb = document.getElementById('sb');
   if (sb) sb.classList.add('show');
   
