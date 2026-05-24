@@ -932,14 +932,12 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
 
 async function runOptimizer() {
   if (!athletes.length) { showToast('No hi ha atletes'); return; }
-  showToast('⏳ Calculant la alineació estratègica...');
-  await new Promise(r => setTimeout(r, 60)); // Buffer de renderizado para evitar bloqueos
+  showToast('⏳ Calculant la millor alineació...');
+  await new Promise(r => setTimeout(r, 10)); // Brevísimo respiro para la UI
 
-  const startTime = Date.now();
-  const TIME_LIMIT = 2000; // Límite estricto de 2 segundos para evitar cuelgues
   const act = athletes.filter(a => !excluded.includes(a.nom));
   
-  // 1. Matriz interna simplificada para el cálculo rápido
+  // 1. Matriz interna simplificada
   const ops = {};
   const ESP_MAP = {
     'VELOCISTA':['100m','200m','Tanques Altes'],
@@ -969,7 +967,7 @@ async function runOptimizer() {
   let currState = {};
   act.forEach(a => currState[a.nom] = ['—', '—']);
 
-  // 2. Evaluador del Algoritmo (Límite estricto de 4 pruebas para atletas filiales)
+  // 2. Evaluador del Algoritmo 
   function getScore(state) {
     let score = 0;
     let tf = 0; 
@@ -1001,7 +999,7 @@ async function runOptimizer() {
       if (act[i].filial) tf += provesAtleta; 
     }
 
-    if (tf > 4) return -1; // Descartar si las filiales superan las 4 pruebas en total
+    if (tf > 4) return -1; // Descartar si las filiales superan 4 pruebas
     if (r100 > 4 || r400 > 4) return -1; 
     
     if (r100 === 4) { score += 1; totalPlacesCob++; }
@@ -1020,13 +1018,12 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Simulación Estocástica
-  let iters = 0;
+  // 3. Simulación Rápida (Sustituimos el temporizador por un número de ciclos fijo)
+  const MAX_ITERS = 40000;
   let temp = 10.0;
   let currentScore = getScore(currState);
   
-  while (Date.now() - startTime < TIME_LIMIT) {
-    iters++;
+  for (let iters = 0; iters < MAX_ITERS; iters++) {
     const aIdx = Math.floor(Math.random() * act.length);
     const aName = act[aIdx].nom;
     const slot = Math.floor(Math.random() * 2);
@@ -1057,7 +1054,7 @@ async function runOptimizer() {
       currentScore = newScore; 
     }
     
-    temp *= 0.9999;
+    temp *= 0.9995; // Enfriamiento más rápido
     if (iters % 8000 === 0) {
       currState = cloneState(bestState);
       currentScore = bestScore;
@@ -1065,7 +1062,7 @@ async function runOptimizer() {
     }
   }
 
-  // 4. Relleno inteligente respetando las 4 pruebas máximas de filiales
+  // 4. Relleno inteligente 
   const covered = new Set();
   let totalFilialEvents = 0;
   
@@ -1096,12 +1093,11 @@ async function runOptimizer() {
     }
   }
 
-  // 5. Inyección limpia en las variables nativas del Simulador (Evita congelamientos)
+  // 5. Inyección limpia en el HTML
   simState = {};
   simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
 
   athletes.forEach(a => {
-    // Inicializar estructura limpia por defecto usando la función nativa del simulador
     simState[a.nom] = [
       { prova: '—', pct: null, man: false },
       { prova: '—', pct: null, man: false }
@@ -1120,7 +1116,6 @@ async function runOptimizer() {
             }
           } else {
             simState[a.nom][slot].prova = p;
-            // Cálculo del porcentaje nativo real sin romper variables
             const ms = (a.marques || []).filter(m => m.prova === p);
             if (ms.length > 0) {
               const ps = ms.map(m => calcPct(m.prova, m.marca, a.dob, m.any)).filter(x => x !== null);
@@ -1132,7 +1127,6 @@ async function runOptimizer() {
     }
   });
 
-  // Guardar estados e invocar renders oficiales
   await saveSimState(simState);
   await saveRelState(simRelState);
   
@@ -1141,8 +1135,7 @@ async function runOptimizer() {
   const sb = document.getElementById('sb');
   if (sb) sb.classList.add('show');
   
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  showToast(`▶ Simulació completada amb èxit en ${elapsed}s!`);
+  showToast(`▶ Simulació completada amb èxit!`);
 }
 
 function updateSummary(){
