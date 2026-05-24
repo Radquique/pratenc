@@ -956,7 +956,8 @@ async function runOptimizer() {
       if (p && p !== '—') m[p] = pc > 0 ? estPts(p, pc, refCampeonats) : 1;
     }
     const esp = (a.notes||'').toUpperCase().split(/[,\s]+/).find(k => ESP_MAP[k]);
-    if (esp) ESP_MAP[esp].forEach(p => { if (!m[p] && !isReleu(p)) m[p] = 1; });
+    // FIX: Sustituido isReleu(p) por p.startsWith('Relleu')
+    if (esp) ESP_MAP[esp].forEach(p => { if (!m[p] && !p.startsWith('Relleu')) m[p] = 1; });
     m['Relleu 4x100'] = 0; 
     m['Relleu 4x400'] = 0;
     ops[a.nom] = m;
@@ -1018,7 +1019,7 @@ async function runOptimizer() {
     return c;
   }
 
-  // 3. Simulación Rápida (Sustituimos el temporizador por un número de ciclos fijo)
+  // 3. Simulación Rápida (40.000 iteraciones en milisegundos)
   const MAX_ITERS = 40000;
   let temp = 10.0;
   let currentScore = getScore(currState);
@@ -1054,7 +1055,7 @@ async function runOptimizer() {
       currentScore = newScore; 
     }
     
-    temp *= 0.9995; // Enfriamiento más rápido
+    temp *= 0.9995; 
     if (iters % 8000 === 0) {
       currState = cloneState(bestState);
       currentScore = bestScore;
@@ -1068,75 +1069,7 @@ async function runOptimizer() {
   
   act.forEach(a => {
     if (bestState[a.nom]) {
-      bestState[a.nom].forEach(p => {
-        if (p && p !== '—') {
-          if (!isReleu(p)) covered.add(p);
-          if (a.filial) totalFilialEvents++;
-        }
-      });
-    }
-  });
-
-  for (const prova of CAMP_PROVES_IND) {
-    if (covered.has(prova)) continue; 
-    for (const a of act) {
-      const s = bestState[a.nom];
-      if (!s || (s[0] !== '—' && s[1] !== '—')) continue; 
-      if (s[0] === prova || s[1] === prova) continue; 
-      if (a.filial && totalFilialEvents >= 4) continue; 
-      
-      const slot = s[0] === '—' ? 0 : 1;
-      s[slot] = prova;
-      covered.add(prova);
-      if (a.filial) totalFilialEvents++;
-      break; 
-    }
-  }
-
-  // 5. Inyección limpia en el HTML
-  simState = {};
-  simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
-
-  athletes.forEach(a => {
-    simState[a.nom] = [
-      { prova: '—', pct: null, man: false },
-      { prova: '—', pct: null, man: false }
-    ];
-
-    const s = bestState[a.nom];
-    if (s && !excluded.includes(a.nom)) {
-      [0, 1].forEach(slot => {
-        const p = s[slot];
-        if (p && p !== '—') {
-          if (isReleu(p)) {
-            const rIdx = simRelState[p].indexOf(null);
-            if (rIdx !== -1) {
-              simRelState[p][rIdx] = a.nom;
-              simState[a.nom][slot].prova = p;
-            }
-          } else {
-            simState[a.nom][slot].prova = p;
-            const ms = (a.marques || []).filter(m => m.prova === p);
-            if (ms.length > 0) {
-              const ps = ms.map(m => calcPct(m.prova, m.marca, a.dob, m.any)).filter(x => x !== null);
-              if (ps.length) simState[a.nom][slot].pct = Math.max(...ps);
-            }
-          }
-        }
-      });
-    }
-  });
-
-  await saveSimState(simState);
-  await saveRelState(simRelState);
-  
-  render();
-  
-  const sb = document.getElementById('sb');
-  if (sb) sb.classList.add('show');
-  
-  showToast(`▶ Simulació completada amb èxit!`);
-}
+      best
 
 function updateSummary(){
   let tot=0,nAtl=0;const rows=[],pm2={};
