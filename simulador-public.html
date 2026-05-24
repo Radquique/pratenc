@@ -932,14 +932,14 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closePM();});
 
 async function runOptimizer() {
   if (!athletes.length) { showToast('No hi ha atletes'); return; }
-  showToast('⏳ Calculant la alineació estratègica...');
+  showToast('⏳ Calculant el màxim absolut...');
   await new Promise(r => setTimeout(r, 60)); // Render buffer
 
   const startTime = Date.now();
   const TIME_LIMIT = 2500; // 2.5s límite
   const act = athletes.filter(a => !excluded.includes(a.nom));
   
-  // 1. Preparar matriz de opciones rápidas (Puntos grandes)
+  // 1. Preparar matriz de opciones
   const ops = {};
   const ESP_MAP = {
     'VELOCISTA':['100m','200m','Tanques Altes'],
@@ -959,7 +959,7 @@ async function runOptimizer() {
     }
     const esp = (a.notes||'').toUpperCase().split(/[,\s]+/).find(k => ESP_MAP[k]);
     if (esp) ESP_MAP[esp].forEach(p => { if (!m[p] && !isReleu(p)) m[p] = 1; });
-    m['Relleu 4x100'] = 0; 
+    m['Relleu 4x100'] = 0; // Se calcula en el score global
     m['Relleu 4x400'] = 0;
     ops[a.nom] = m;
   });
@@ -969,64 +969,63 @@ async function runOptimizer() {
   let currState = {};
   act.forEach(a => currState[a.nom] = [null, null]);
 
-  // 2. Evaluador Holístico Avanzado
+  // 2. Evaluador Holístico (Incluye Relevos en tiempo real)
   function getScore(state) {
     let score = 0;
-    let tf = 0; // Total pruebas de filiales
+    let tf = 0;
     const cov = {};
     let r100 = 0, r400 = 0;
-    let totalPlacesCob = 0;
 
     for (let i = 0; i < act.length; i++) {
       const nom = act[i].nom;
       const s = state[nom];
-      let provesAtleta = 0;
+      let hasFilialEvent = false;
 
       for (let j = 0; j < 2; j++) {
         const p = s[j];
         if (!p) continue;
-        
-        provesAtleta++;
+        hasFilialEvent = true;
 
         if (p === 'Relleu 4x100') r100++;
         else if (p === 'Relleu 4x400') r400++;
         else {
           if (!cov[p]) {
-            cov[p] = true;
+            cov[p] = true; // Solo 1 atleta puntúa por prueba
             score += ops[nom][p] || 1;
-            totalPlacesCob++;
           }
         }
       }
-      if (act[i].filial) tf += provesAtleta; 
+      if (act[i].filial && hasFilialEvent) tf++;
     }
 
-    if (tf > 4) return -1; // Límite estricto de pruebas de filiales
+    if (tf > 4) return -1; // Límite de filiales excedido
     if (r100 > 4 || r400 > 4) return -1; 
     
-    // Modificación estratégica: Los relevos completos solo suman 1 punto para priorizar individuales
-    if (r100 === 4) { score += 1; totalPlacesCob++; }
-    if (r400 === 4) { score += 1; totalPlacesCob++; }
+    // El relevo solo suma si está completo
+    if (r100 === 4) score += 4;
+    if (r400 === 4) score += 4;
     
-    // Norma del 75%: Obligatorio alcanzar mínimo 21 plazas cubiertas totales
-    if (totalPlacesCob < 21) return -1;
-    
-    return score + (totalPlacesCob * 0.001); 
+    return score;
   }
 
   function cloneState(st) {
     const c = {};
-    for (let i = 0; i < act.length; i++) c[act[i].nom] = [st[act[i].nom][0], st[act[i].nom][1]];
+    for (let i = 0; i < act.length; i++) {
+      const n = act[i].nom;
+      c[n] = [st[n][0], st[n][1]];
+    }
     return c;
   }
 
-  // 3. Motor de Permutaciones de Bloque Estocástico
+  // 3. Motor Estocástico (Simulated Annealing)
   let iters = 0;
   let temp = 10.0;
   let currentScore = getScore(currState);
   
   while (Date.now() - startTime < TIME_LIMIT) {
     iters++;
+    
+    // Mutación aleatoria
     const aIdx = Math.floor(Math.random() * act.length);
     const aName = act[aIdx].nom;
     const slot = Math.floor(Math.random() * 2);
@@ -1036,7 +1035,7 @@ async function runOptimizer() {
     const newP = availableProves[Math.floor(Math.random() * availableProves.length)];
     
     if (newP === oldP) continue;
-    if (newP && currState[aName][1-slot] === newP) continue; 
+    if (newP && currState[aName][1-slot] === newP) continue; // Evitar duplicados
     
     currState[aName][slot] = newP;
     const newScore = getScore(currState);
@@ -1046,18 +1045,21 @@ async function runOptimizer() {
       bestState = cloneState(currState);
     }
     
+    // ¿Aceptar empeorar temporalmente para desatascar el algoritmo?
     if (newScore < currentScore) {
       const delta = currentScore - newScore;
       if (Math.random() > Math.exp(-delta / temp)) {
-        currState[aName][slot] = oldP; 
+        currState[aName][slot] = oldP; // Rechazar
       } else {
-        currentScore = newScore; 
+        currentScore = newScore; // Aceptar
       }
     } else {
       currentScore = newScore; 
     }
     
-    temp *= 0.9999;
+    temp *= 0.9999; // Enfriamiento
+    
+    // Random Restarts (Volver al mejor punto y recalentar si se pierde)
     if (iters % 8000 === 0) {
       currState = cloneState(bestState);
       currentScore = bestScore;
@@ -1065,39 +1067,7 @@ async function runOptimizer() {
     }
   }
 
-  // 4. FASE DE RELLENO PROTEGIDA (No altera los límites regulatorios)
-  const covered = new Set();
-  let totalFilialEvents = 0;
-  
-  act.forEach(a => {
-    bestState[a.nom].forEach(p => {
-      if (p) {
-        if (!isReleu(p)) covered.add(p);
-        if (a.filial) totalFilialEvents++;
-      }
-    });
-  });
-
-  for (const prova of CAMP_PROVES_IND) {
-    if (covered.has(prova)) continue; 
-    
-    for (const a of act) {
-      const s = bestState[a.nom];
-      if (s[0] && s[1]) continue; 
-      if (s[0] === prova || s[1] === prova) continue; 
-      
-      // Control antibugs: Si meter la prueba rompe las 4 del bloque filial, saltar atleta
-      if (a.filial && totalFilialEvents >= 4) continue; 
-      
-      const slot = s[0] ? 1 : 0;
-      s[slot] = prova;
-      covered.add(prova);
-      if (a.filial) totalFilialEvents++;
-      break; 
-    }
-  }
-
-  // 5. Traspaso y renderizado final en la UI
+  // 4. Aplicar la alineación ganadora
   const ns = {};
   simRelState = { 'Relleu 4x100': [null,null,null,null], 'Relleu 4x400': [null,null,null,null] };
 
@@ -1106,6 +1076,7 @@ async function runOptimizer() {
       { prova: bestState[a.nom][0] || '—', pct: null, man: false },
       { prova: bestState[a.nom][1] || '—', pct: null, man: false }
     ];
+    // Rellenar visualmente la UI de relevos
     [0, 1].forEach(slot => {
       const p = bestState[a.nom][slot];
       if (isReleu(p)) {
@@ -1122,7 +1093,7 @@ async function runOptimizer() {
   document.getElementById('sb').classList.add('show');
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  showToast(`▶ Simulació completada amb èxit estructural en ${elapsed}s!`);
+  showToast(`▶ Màxim trobat (${bestScore} pts) en ${elapsed}s! [Iters: ${iters}]`);
 }
 
 function updateSummary(){
