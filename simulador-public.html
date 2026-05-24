@@ -939,7 +939,7 @@ async function runOptimizer() {
   const TIME_LIMIT = 2500; // 2.5s límite
   const act = athletes.filter(a => !excluded.includes(a.nom));
   
-  // 1. Preparar matriz de opciones rápidas
+  // 1. Preparar matriz de opciones rápidas (Puntos grandes)
   const ops = {};
   const ESP_MAP = {
     'VELOCISTA':['100m','200m','Tanques Altes'],
@@ -964,12 +964,12 @@ async function runOptimizer() {
     ops[a.nom] = m;
   });
 
-  let bestScore = -999999;
+  let bestScore = -1;
   let bestState = {};
   let currState = {};
   act.forEach(a => currState[a.nom] = [null, null]);
 
-  // 2. Evaluador Holístico Corregido (Con penalizaciones progresivas)
+  // 2. Evaluador Holístico Avanzado
   function getScore(state) {
     let score = 0;
     let tf = 0; // Total pruebas de filiales
@@ -984,7 +984,7 @@ async function runOptimizer() {
 
       for (let j = 0; j < 2; j++) {
         const p = s[j];
-        if (!p || p === '—') continue;
+        if (!p) continue;
         
         provesAtleta++;
 
@@ -994,38 +994,22 @@ async function runOptimizer() {
           if (!cov[p]) {
             cov[p] = true;
             score += ops[nom][p] || 1;
-            totalPlacesCob++; // Prueba individual suma 1 plaza
+            totalPlacesCob++;
           }
         }
       }
       if (act[i].filial) tf += provesAtleta; 
     }
 
-    // --- REGLAS ESTRICTAS MEDIANTE PENALIZACIÓN ---
+    if (tf > 4) return -1; // Límite estricto de pruebas de filiales
+    if (r100 > 4 || r400 > 4) return -1; 
     
-    // 1. Filiales: Límite de 4 estricto
-    if (tf > 4) {
-      score -= 1000 * (tf - 4); 
-    }
-
-    // 2. Control de exceso de atletas en un relevo
-    if (r100 > 4) score -= 1000 * (r100 - 4);
-    if (r400 > 4) score -= 1000 * (r400 - 4);
+    // Modificación estratégica: Los relevos completos solo suman 1 punto para priorizar individuales
+    if (r100 === 4) { score += 1; totalPlacesCob++; }
+    if (r400 === 4) { score += 1; totalPlacesCob++; }
     
-    // 3. Relevos: Valen solo 1 punto para priorizar individuales, pero aportan 4 plazas
-    let relleusComplets = 0;
-    if (r100 === 4) { score += 1; totalPlacesCob += 4; relleusComplets++; }
-    if (r400 === 4) { score += 1; totalPlacesCob += 4; relleusComplets++; }
-    
-    // 4. Norma del 75%: Obligatorio llegar a 21 plazas
-    if (totalPlacesCob < 21) {
-      score -= 500 * (21 - totalPlacesCob);
-    }
-
-    // 5. Deducción lógica: Mínimo 1 relevo es obligatorio
-    if (relleusComplets === 0) {
-      score -= 2000;
-    }
+    // Norma del 75%: Obligatorio alcanzar mínimo 21 plazas cubiertas totales
+    if (totalPlacesCob < 21) return -1;
     
     return score + (totalPlacesCob * 0.001); 
   }
@@ -1081,13 +1065,13 @@ async function runOptimizer() {
     }
   }
 
-  // 4. FASE DE RELLENO PROTEGIDA
+  // 4. FASE DE RELLENO PROTEGIDA (No altera los límites regulatorios)
   const covered = new Set();
   let totalFilialEvents = 0;
   
   act.forEach(a => {
     bestState[a.nom].forEach(p => {
-      if (p && p !== '—') {
+      if (p) {
         if (!isReleu(p)) covered.add(p);
         if (a.filial) totalFilialEvents++;
       }
@@ -1102,7 +1086,7 @@ async function runOptimizer() {
       if (s[0] && s[1]) continue; 
       if (s[0] === prova || s[1] === prova) continue; 
       
-      // Bloqueo total antibugs: Si la filial llega a 4 pruebas, saltar a la siguiente atleta
+      // Control antibugs: Si meter la prueba rompe las 4 del bloque filial, saltar atleta
       if (a.filial && totalFilialEvents >= 4) continue; 
       
       const slot = s[0] ? 1 : 0;
